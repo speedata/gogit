@@ -227,3 +227,23 @@ func TestReadCommit(t *testing.T) {
 	}
 
 }
+
+func TestBlob(t *testing.T) {
+	blobsha1 := "6c493ff740f9380390d5c9ddef4af18697ac9375"
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	if err != nil {
+		t.Error(err)
+	}
+	oid, err := NewOidFromString(blobsha1)
+	if err != nil {
+		t.Error(err)
+	}
+	blob, err := repos.LookupBlob(oid)
+	if err != nil {
+		t.Error(err)
+	}
+	if s := blob.Size(); s != 6 {
+		t.Error("Blob size should be 6, got", s)
+	}
+
+}

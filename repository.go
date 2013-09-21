@@ -278,11 +278,11 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 
 	var baseObjectOffset uint64
 	switch objecttype {
-	case _PACK_OBJ_COMMIT, _PACK_OBJ_TREE:
+	case _PACK_OBJ_COMMIT, _PACK_OBJ_TREE, _PACK_OBJ_BLOB:
 		// commit
 		b, err := readFromZip(file, offsetInt+pos, uncompressedLength)
 		return b, err
-	case _PACK_OBJ_BLOB, _PACK_OBJ_TAG:
+	case _PACK_OBJ_TAG:
 		log.Fatal("not implemented yet")
 	case _PACK_OBJ_DELTA_ENCODED_OFFSET:
 		// DELTA_ENCODED object w/ offset to base
