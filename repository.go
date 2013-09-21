@@ -318,6 +318,71 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 	return resultObject, nil
 }
 
+// Return length as integer from zero terminated string
+// and the beginning of the real object
+func getLengthZeroTerminated(b []byte) (int, int) {
+	i := 0
+	var pos int
+	for b[i] != 0 {
+		i++
+	}
+	pos = i
+	i--
+	length := 0
+	pow := 1
+	for i >= 0 {
+		length = length + (int(b[i])-48)*pow
+		pow = pow * 10
+		i--
+	}
+	return length, pos + 1
+}
+
+// Read the contents of the file at path
+// Return the content type, the contents of the file and error, if any
+func readFile(path string) (string, []byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	r, err := zlib.NewReader(file)
+	if err != nil {
+		return "", nil, err
+	}
+	defer r.Close()
+	first_buffer_size := 1024
+	b := make([]byte, first_buffer_size)
+	n, err := r.Read(b)
+	if err != nil {
+		return "", nil, err
+	}
+	spaceposition := bytes.IndexByte(b, ' ')
+
+	// "tree", "commit", "blob", ...
+	objecttype := string(b[:spaceposition])
+
+	// length starts at the position after the space
+	length, objstart := getLengthZeroTerminated(b[spaceposition+1:])
+
+	objstart = objstart + spaceposition + 1
+	// if the size of our buffer is less than the object length + the bytes
+	// in front of the object (example: "commit 234\0") we need to increase
+	// the size of the buffer and read the rest. Warning: this should only
+	// be done on small files
+	if n < length+objstart {
+		remaining_bytes := make([]byte, length-first_buffer_size+objstart)
+		n, err = r.Read(remaining_bytes)
+		if n != length-first_buffer_size+objstart {
+			return "", nil, errors.New("Remaining bytes do not match")
+		}
+		if err != nil {
+			return "", nil, err
+		}
+		b = append(b, remaining_bytes...)
+	}
+	return objecttype, b[objstart : objstart+length], nil
+}
+
 func (repos *Repository) getRawObject(oid *Oid) ([]byte, error) {
 	// first we need to find out where the commit is stored
 	objpath := filepathFromSHA1(repos.Rootdir, oid.String())
@@ -329,8 +394,10 @@ func (repos *Repository) getRawObject(oid *Oid) ([]byte, error) {
 				return readObjectBytes(indexfile.packpath, offset)
 			}
 		}
+		return nil, errors.New("Object not found")
 	}
-	return nil, nil
+	_, data, err := readFile(objpath)
+	return data, err
 }
 
 // Open the repository at the given path.

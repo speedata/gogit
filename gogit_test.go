@@ -23,6 +23,8 @@ func TestOpen(t *testing.T) {
 	if res != exp {
 		t.Error("in ref.Name", res, "is not", exp)
 	}
+	// Not sure if resolveInfo is really needed, it seems to be for
+	// dumb protocols only
 	inforef, err := ref.resolveInfo()
 	if err != nil {
 		t.Error(err)
@@ -32,6 +34,8 @@ func TestOpen(t *testing.T) {
 	if res != exp {
 		t.Error("inforef.Oid.String()", res, "is not", exp)
 	}
+	// ---------------
+	exp = "29ad9d799ae51db518d09d307125bcc212688eb4"
 	newref, err := ref.Resolve()
 	if err != nil {
 		t.Error(err)
@@ -39,8 +43,8 @@ func TestOpen(t *testing.T) {
 	if false {
 		_ = newref
 	}
-	if newref.Oid.String() != "7647bdef73cde0888222b7ea00f5e83b151a25d0" {
-		t.Error(newref.Oid.String(), "should be", "7647bdef73cde0888222b7ea00f5e83b151a25d0")
+	if newref.Oid.String() != exp {
+		t.Error(newref.Oid.String(), "should be", exp)
 		t.Fail()
 	}
 }
@@ -121,13 +125,31 @@ func TestLookupCommit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
+	// ------------- in packfile
 	oid, err := NewOidFromString("8496add21eddc0cdc78a121c5df6b41bb685b886")
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = repos.LookupCommit(oid)
+	ci, err := repos.LookupCommit(oid)
+	if err != nil {
+		t.Error(err)
+	}
+	if n := ci.Author.Name; n != "Patrick Gundlach" {
+		t.Error("Expected Author Patrick Gundlach, but got", n)
+	}
+	// ----------- separate object
+	oid, err = NewOidFromString("29ad9d799ae51db518d09d307125bcc212688eb4")
+	if err != nil {
+		t.Error(err)
+	}
+	ci, err = repos.LookupCommit(oid)
+	if err != nil {
+		t.Error(err)
+	}
+	if n := ci.Author.Name; n != "Patrick Gundlach" {
+		t.Error("Expected Author Patrick Gundlach, but got", n)
+	}
 
 }
 
