@@ -23,7 +23,14 @@ package gogit
 import (
 	"bytes"
 	"errors"
+	"path"
 )
+
+// A tree is a flat directory listing.
+type Tree struct {
+	TreeEntries []*TreeEntry
+	repository  *Repository
+}
 
 // A tree entry is similar to a directory entry (file name, type) in a real file system.
 type TreeEntry struct {
@@ -46,21 +53,16 @@ const (
 func (t ObjectType) String() string {
 	switch t {
 	case OBJ_COMMIT:
-		return "Commit"
+		return "commit"
 	case OBJ_TREE:
-		return "Tree"
+		return "tree"
 	case OBJ_BLOB:
-		return "Blob"
+		return "blob"
 	case OBJ_SYMLINK:
-		return "Symlink"
+		return "symlink"
 	default:
 		return ""
 	}
-}
-
-// A tree is a flat directory listing.
-type Tree struct {
-	TreeEntries []*TreeEntry
 }
 
 // Parse tree information from the (uncompressed) raw
@@ -127,4 +129,56 @@ func (t *Tree) EntryByIndex(index int) *TreeEntry {
 // len(t.TreeEntries).
 func (t *Tree) EntryCount() int {
 	return len(t.TreeEntries)
+}
+
+type TreeWalkCallback func(string, *TreeEntry) int
+
+// The entries will be traversed in the specified order,
+// children subtrees will be automatically loaded as required, and the
+// callback will be called once per entry with the current (relative) root
+// for the entry and the entry data itself.
+//
+// If the callback returns a positive value, the passed entry will be skipped
+// on the traversal (in pre mode). A negative value stops the walk.
+func (t *Tree) Walk(callback TreeWalkCallback) error {
+	t._walk(callback, "")
+	return nil
+}
+
+func (t *Tree) _walk(cb TreeWalkCallback, dirname string) bool {
+	for _, te := range t.TreeEntries {
+		cont := cb(dirname, te)
+		switch {
+		case cont < 0:
+			return false
+		case cont == 0:
+			// descend if it is a tree
+			if te.Type == OBJ_TREE {
+				t, err := t.repository.LookupTree(te.Id)
+				if err != nil {
+					return false
+				}
+				if t._walk(cb, path.Join(dirname, te.Name)) == false {
+					return false
+				}
+			}
+		case cont > 0:
+			// do nothing, don't descend into the tree
+		}
+	}
+	return true
+}
+
+// Find the tree object in the repository.
+func (repos *Repository) LookupTree(oid *Oid) (*Tree, error) {
+	data, err := repos.getRawObject(oid)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := parseTreeData(data)
+	tree.repository = repos
+	if err != nil {
+		return nil, err
+	}
+	return tree, nil
 }
