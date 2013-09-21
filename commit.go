@@ -25,31 +25,52 @@ import (
 )
 
 type Commit struct {
-	Author    *Signature
-	Committer *Signature
-	treeId    *Oid
-	tree      *Tree
-	message   string
-	parents   []string // sha1 strings
+	Author        *Signature
+	Committer     *Signature
+	Oid           *Oid // The id of this commit object
+	CommitMessage string
+	treeId        *Oid
+	tree          *Tree
+	parents       []*Oid // sha1 strings
+	repository    *Repository
 }
 
-// // Return the commit message
-// func (ci *Commit) Message() string {
-// 	return ci.message
-// }
+// Return the commit message. Same as retrieving CommitMessage directly.
+func (ci *Commit) Message() string {
+	return ci.CommitMessage
+}
 
-// // Return parent number n (0-based index)
-// func (ci *Commit) Parent(n int) *Commit {
-// }
+// Get the id of the commit.
+func (ci *Commit) Id() *Oid {
+	return ci.Oid
+}
 
-// // Return oid of the parent number n (0-based index)
-// func (ci *Commit) ParentId(n int) *Oid {
-// }
+// Return parent number n (0-based index)
+func (ci *Commit) Parent(n int) *Commit {
+	if n >= len(ci.parents) {
+		return nil
+	}
+	oid := ci.parents[n]
+	parent, err := ci.repository.LookupCommit(oid)
+	if err != nil {
+		return nil
+	}
+	return parent
+}
 
-// // Return the number of parents of the commit. 0 if this is the
-// // root commit, otherwise 1,2,...
-// func (ci *Commit) ParentCount() int {
-// }
+// Return oid of the parent number n (0-based index). Return nil if no such parent exists.
+func (ci *Commit) ParentId(n int) *Oid {
+	if n >= len(ci.parents) {
+		return nil
+	}
+	return ci.parents[n]
+}
+
+// Return the number of parents of the commit. 0 if this is the
+// root commit, otherwise 1,2,...
+func (ci *Commit) ParentCount() int {
+	return len(ci.parents)
+}
 
 // Return the (root) tree of this commit.
 // Error is always nil (error is there for compatibility with git2go).
@@ -66,7 +87,7 @@ func (ci *Commit) TreeId() *Oid {
 // data from the commit object.
 func parseCommitData(data []byte) (*Commit, error) {
 	commit := new(Commit)
-	commit.parents = make([]string, 0, 1)
+	commit.parents = make([]*Oid, 0, 1)
 	// we now have the contents of the commit object. Let's investigate...
 	nextline := 0
 l:
@@ -86,7 +107,11 @@ l:
 				commit.treeId = oid
 			case "parent":
 				// A commit can have one or more parents
-				commit.parents = append(commit.parents, string(line[spacepos+1:]))
+				oid, err := NewOidFromString(string(line[spacepos+1:]))
+				if err != nil {
+					return nil, err
+				}
+				commit.parents = append(commit.parents, oid)
 			case "author":
 				sig, err := newSignatureFromCommitline(line[spacepos+1:])
 				if err != nil {
@@ -102,7 +127,7 @@ l:
 			}
 			nextline = nextline + eol + 1
 		case eol == 0:
-			commit.message = string(data[nextline+1:])
+			commit.CommitMessage = string(data[nextline+1:])
 			nextline = nextline + 1
 		default:
 			break l
@@ -121,6 +146,8 @@ func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
 	if err != nil {
 		return nil, err
 	}
+	ci.repository = repos
+	ci.Oid = oid
 
 	data, err = repos.getRawObject(ci.treeId)
 	if err != nil {

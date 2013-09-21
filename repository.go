@@ -40,12 +40,12 @@ type Repository struct {
 type SHA1 [20]byte
 
 const (
-	OBJ_COMMIT               = 0x10
-	OBJ_TREE                 = 0x20
-	OBJ_BLOB                 = 0x30
-	OBJ_TAG                  = 0x40
-	OBJ_DELTA_ENCODED_OFFSET = 0x60
-	OBJ_DELTA_ENCODED_OBJ_ID = 0x70
+	_OBJ_COMMIT               = 0x10
+	_OBJ_TREE                 = 0x20
+	_OBJ_BLOB                 = 0x30
+	_OBJ_TAG                  = 0x40
+	_OBJ_DELTA_ENCODED_OFFSET = 0x60
+	_OBJ_DELTA_ENCODED_OBJ_ID = 0x70
 )
 
 // index file
@@ -278,13 +278,13 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 
 	var baseObjectOffset uint64
 	switch objecttype {
-	case OBJ_COMMIT, OBJ_TREE:
+	case _OBJ_COMMIT, _OBJ_TREE:
 		// commit
 		b, err := readFromZip(file, offsetInt+pos, uncompressedLength)
 		return b, err
-	case OBJ_BLOB, OBJ_TAG:
+	case _OBJ_BLOB, _OBJ_TAG:
 		log.Fatal("not implemented yet")
-	case OBJ_DELTA_ENCODED_OFFSET:
+	case _OBJ_DELTA_ENCODED_OFFSET:
 		// DELTA_ENCODED object w/ offset to base
 		// Read the offset first, then calculate the starting point
 		// of the base object
@@ -295,7 +295,7 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 		}
 		baseObjectOffset = uint64(offsetInt - num)
 		pos = pos + 1
-	case OBJ_DELTA_ENCODED_OBJ_ID:
+	case _OBJ_DELTA_ENCODED_OBJ_ID:
 		// DELTA_ENCODED object w/ base BINARY_OBJ_ID
 		log.Fatal("not implemented yet")
 	}

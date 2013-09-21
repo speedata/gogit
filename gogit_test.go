@@ -163,6 +163,20 @@ func TestReadCommit(t *testing.T) {
 	if commit.Author.Name != "Patrick Gundlach" {
 		t.Error("Expected author name: Patrick Gundlach but got", commit.Author.Name)
 	}
+
+	if np := commit.ParentCount(); np != 1 {
+		t.Error("Expected 1 parent, got", np)
+	}
+	{
+		expected := "aebcb66c85f05557b999ced9c60ec275a5cab71d"
+		if parentCommit := commit.ParentId(0).String(); parentCommit != expected {
+			t.Error("Expected", expected, "as parentId of commit, but got", parentCommit)
+		}
+		if parentCommit := commit.Parent(0).Id().String(); parentCommit != expected {
+			t.Error("Expected", expected, "as parent of commit, but got", parentCommit)
+		}
+	}
+
 	// err is never set
 	tree, _ := commit.Tree()
 	if ec := tree.EntryCount(); ec != 7 {
@@ -187,12 +201,4 @@ func TestReadCommit(t *testing.T) {
 		}
 	}
 
-}
-
-func BenchmarkSHAtoHex(b *testing.B) {
-	sha_bin := []byte{201, 202, 203, 204, 205, 206, 207, 208, 209, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 0}
-	oid, _ := NewOid(sha_bin)
-	for i := 0; i < b.N; i++ {
-		oid.String()
-	}
 }

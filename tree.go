@@ -22,9 +22,10 @@ package gogit
 
 import (
 	"bytes"
-	"log"
+	"errors"
 )
 
+// A tree entry is similar to a directory entry (file name, type) in a real file system.
 type TreeEntry struct {
 	Filemode int
 	Name     string
@@ -32,15 +33,16 @@ type TreeEntry struct {
 	// Type
 }
 
+// A tree is a flat directory listing.
 type Tree struct {
-	treeentries []*TreeEntry
+	TreeEntries []*TreeEntry
 }
 
 // Parse tree information from the (uncompressed) raw
 // data from the tree object.
 func parseTreeData(data []byte) (*Tree, error) {
 	tree := new(Tree)
-	tree.treeentries = make([]*TreeEntry, 0, 10)
+	tree.TreeEntries = make([]*TreeEntry, 0, 10)
 	l := len(data)
 	pos := 0
 	for pos < l {
@@ -56,7 +58,7 @@ func parseTreeData(data []byte) (*Tree, error) {
 		case "40000":
 			te.Filemode = 0040000
 		default:
-			log.Println("unknown type:", string(data[pos:pos+2]))
+			return nil, errors.New("unknown type: " + string(data[pos:pos+2]))
 		}
 		pos += spacepos + 1
 		zero := bytes.IndexByte(data[pos:], 0)
@@ -68,14 +70,14 @@ func parseTreeData(data []byte) (*Tree, error) {
 		}
 		te.Id = oid
 		pos = pos + 20
-		tree.treeentries = append(tree.treeentries, te)
+		tree.TreeEntries = append(tree.TreeEntries, te)
 	}
 	return tree, nil
 }
 
 // Find the entry in this directory (tree) with the given name.
 func (t *Tree) EntryByName(name string) *TreeEntry {
-	for _, v := range t.treeentries {
+	for _, v := range t.TreeEntries {
 		if v.Name == name {
 			return v
 		}
@@ -83,15 +85,17 @@ func (t *Tree) EntryByName(name string) *TreeEntry {
 	return nil
 }
 
-// Get the n-th entry of this tree (0 = first entry).
+// Get the n-th entry of this tree (0 = first entry). You can also access
+// t.TreeEntries[index] directly.
 func (t *Tree) EntryByIndex(index int) *TreeEntry {
-	if index >= len(t.treeentries) {
+	if index >= len(t.TreeEntries) {
 		return nil
 	}
-	return t.treeentries[index]
+	return t.TreeEntries[index]
 }
 
-// Get the number of entries in the directory (tree).
+// Get the number of entries in the directory (tree). Same as
+// len(t.TreeEntries).
 func (t *Tree) EntryCount() int {
-	return len(t.treeentries)
+	return len(t.TreeEntries)
 }
