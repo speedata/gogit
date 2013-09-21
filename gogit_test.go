@@ -187,6 +187,9 @@ func TestReadCommit(t *testing.T) {
 		if te.Name != "dirc" {
 			t.Error("Wrong entry in tree.EntryByIndex. Expected 'dirc', got", te.Name)
 		}
+		if te.Type != OBJ_TREE {
+			t.Error("Object should be a tree, but is", te.Type.String())
+		}
 	}
 	{
 		te := tree.EntryByName("dirc")

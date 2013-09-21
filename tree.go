@@ -30,7 +30,32 @@ type TreeEntry struct {
 	Filemode int
 	Name     string
 	Id       *Oid
-	// Type
+	Type     ObjectType
+}
+
+// Who am I?
+type ObjectType int
+
+const (
+	OBJ_COMMIT ObjectType = iota
+	OBJ_SYMLINK
+	OBJ_TREE
+	OBJ_BLOB
+)
+
+func (t ObjectType) String() string {
+	switch t {
+	case OBJ_COMMIT:
+		return "Commit"
+	case OBJ_TREE:
+		return "Tree"
+	case OBJ_BLOB:
+		return "Blob"
+	case OBJ_SYMLINK:
+		return "Symlink"
+	default:
+		return ""
+	}
 }
 
 // A tree is a flat directory listing.
@@ -51,12 +76,16 @@ func parseTreeData(data []byte) (*Tree, error) {
 		switch string(data[pos : pos+spacepos]) {
 		case "100644":
 			te.Filemode = 0100644
+			te.Type = OBJ_BLOB
 		case "120000":
 			te.Filemode = 0120000
+			te.Type = OBJ_SYMLINK
 		case "160000":
 			te.Filemode = 0160000
+			te.Type = OBJ_COMMIT
 		case "40000":
 			te.Filemode = 0040000
+			te.Type = OBJ_TREE
 		default:
 			return nil, errors.New("unknown type: " + string(data[pos:pos+2]))
 		}
