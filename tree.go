@@ -20,6 +20,11 @@
 
 package gogit
 
+import (
+	"bytes"
+	"log"
+)
+
 type TreeEntry struct {
 	Filemode int
 	Name     string
@@ -31,10 +36,62 @@ type Tree struct {
 	treeentries []*TreeEntry
 }
 
-// func (t *Tree) EntryByName(name string) *TreeEntry {
-// }
+// Parse tree information from the (uncompressed) raw
+// data from the tree object.
+func parseTreeData(data []byte) (*Tree, error) {
+	tree := new(Tree)
+	tree.treeentries = make([]*TreeEntry, 0, 10)
+	l := len(data)
+	pos := 0
+	for pos < l {
+		te := new(TreeEntry)
+		spacepos := bytes.IndexByte(data[pos:], ' ')
+		switch string(data[pos : pos+spacepos]) {
+		case "100644":
+			te.Filemode = 0100644
+		case "120000":
+			te.Filemode = 0120000
+		case "160000":
+			te.Filemode = 0160000
+		case "40000":
+			te.Filemode = 0040000
+		default:
+			log.Println("unknown type:", string(data[pos:pos+2]))
+		}
+		pos += spacepos + 1
+		zero := bytes.IndexByte(data[pos:], 0)
+		te.Name = string(data[pos : pos+zero])
+		pos += zero + 1
+		oid, err := NewOid(data[pos : pos+20])
+		if err != nil {
+			return nil, err
+		}
+		te.Id = oid
+		pos = pos + 20
+		tree.treeentries = append(tree.treeentries, te)
+	}
+	return tree, nil
+}
 
-// func (t *Tree) EntryByIndex(i int) *TreeEntry {
-// }
+// Find the entry in this directory (tree) with the given name.
+func (t *Tree) EntryByName(name string) *TreeEntry {
+	for _, v := range t.treeentries {
+		if v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
 
-// func (t *Tree) EntryCount() int {}
+// Get the n-th entry of this tree (0 = first entry).
+func (t *Tree) EntryByIndex(index int) *TreeEntry {
+	if index >= len(t.treeentries) {
+		return nil
+	}
+	return t.treeentries[index]
+}
+
+// Get the number of entries in the directory (tree).
+func (t *Tree) EntryCount() int {
+	return len(t.treeentries)
+}

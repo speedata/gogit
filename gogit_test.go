@@ -163,6 +163,30 @@ func TestReadCommit(t *testing.T) {
 	if commit.Author.Name != "Patrick Gundlach" {
 		t.Error("Expected author name: Patrick Gundlach but got", commit.Author.Name)
 	}
+	// err is never set
+	tree, _ := commit.Tree()
+	if ec := tree.EntryCount(); ec != 7 {
+		t.Error("Expected 7 entries in the tree, got", ec)
+	}
+	{
+		te := tree.EntryByIndex(2)
+		if te.Name != "dirc" {
+			t.Error("Wrong entry in tree.EntryByIndex. Expected 'dirc', got", te.Name)
+		}
+	}
+	{
+		te := tree.EntryByName("dirc")
+		if te.Name != "dirc" {
+			t.Error("Wrong entry in tree.EntryByIndex. Expected 'dirc', got", te.Name)
+		}
+	}
+	{
+		te := tree.EntryByName("doesnotexist")
+		if te != nil {
+			t.Error("Expect nil")
+		}
+	}
+
 }
 
 func BenchmarkSHAtoHex(b *testing.B) {

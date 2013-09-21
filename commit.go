@@ -22,13 +22,13 @@ package gogit
 
 import (
 	"bytes"
-	"log"
 )
 
 type Commit struct {
 	Author    *Signature
 	Committer *Signature
 	treeId    *Oid
+	tree      *Tree
 	message   string
 	parents   []string // sha1 strings
 }
@@ -46,27 +46,27 @@ type Commit struct {
 // func (ci *Commit) ParentId(n int) *Oid {
 // }
 
-// Return the (root) tree of this commit
-func (ci *Commit) Tree() (*Tree, error) {
-	t := new(Tree)
-	log.Println("New tree")
-	return t, nil
-}
-
-// Return oid of the (root) tree of this commit
-func (ci *Commit) TreeId() *Oid {
-	return ci.treeId
-}
-
 // // Return the number of parents of the commit. 0 if this is the
 // // root commit, otherwise 1,2,...
 // func (ci *Commit) ParentCount() int {
 // }
 
+// Return the (root) tree of this commit.
+// Error is always nil (error is there for compatibility with git2go).
+func (ci *Commit) Tree() (*Tree, error) {
+	return ci.tree, nil
+}
+
+// Return oid of the (root) tree of this commit.
+func (ci *Commit) TreeId() *Oid {
+	return ci.treeId
+}
+
+// Parse commit information from the (uncompressed) raw
+// data from the commit object.
 func parseCommitData(data []byte) (*Commit, error) {
 	commit := new(Commit)
 	commit.parents = make([]string, 0, 1)
-	log.Println(string(data))
 	// we now have the contents of the commit object. Let's investigate...
 	nextline := 0
 l:
@@ -117,8 +117,19 @@ func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
 	if err != nil {
 		return nil, err
 	}
+	ci, err := parseCommitData(data)
 	if err != nil {
 		return nil, err
 	}
-	return parseCommitData(data)
+
+	data, err = repos.getRawObject(ci.treeId)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := parseTreeData(data)
+	if err != nil {
+		return nil, err
+	}
+	ci.tree = tree
+	return ci, nil
 }
