@@ -21,24 +21,104 @@
 package gogit
 
 import (
-	"os"
+	"bytes"
+	"log"
 )
 
 type Commit struct {
+	Author    *Signature
+	Committer *Signature
+	treeId    *Oid
+	message   string
+	parents   []string // sha1 strings
+}
+
+// // Return the commit message
+// func (ci *Commit) Message() string {
+// 	return ci.message
+// }
+
+// // Return parent number n (0-based index)
+// func (ci *Commit) Parent(n int) *Commit {
+// }
+
+// // Return oid of the parent number n (0-based index)
+// func (ci *Commit) ParentId(n int) *Oid {
+// }
+
+// Return the (root) tree of this commit
+func (ci *Commit) Tree() (*Tree, error) {
+	t := new(Tree)
+	log.Println("New tree")
+	return t, nil
+}
+
+// Return oid of the (root) tree of this commit
+func (ci *Commit) TreeId() *Oid {
+	return ci.treeId
+}
+
+// // Return the number of parents of the commit. 0 if this is the
+// // root commit, otherwise 1,2,...
+// func (ci *Commit) ParentCount() int {
+// }
+
+func parseCommitData(data []byte) (*Commit, error) {
+	commit := new(Commit)
+	commit.parents = make([]string, 0, 1)
+	log.Println(string(data))
+	// we now have the contents of the commit object. Let's investigate...
+	nextline := 0
+l:
+	for {
+		eol := bytes.IndexByte(data[nextline:], '\n')
+		switch {
+		case eol > 0:
+			line := data[nextline : nextline+eol]
+			spacepos := bytes.IndexByte(line, ' ')
+			reftype := line[:spacepos]
+			switch string(reftype) {
+			case "tree":
+				oid, err := NewOidFromString(string(line[spacepos+1:]))
+				if err != nil {
+					return nil, err
+				}
+				commit.treeId = oid
+			case "parent":
+				// A commit can have one or more parents
+				commit.parents = append(commit.parents, string(line[spacepos+1:]))
+			case "author":
+				sig, err := newSignatureFromCommitline(line[spacepos+1:])
+				if err != nil {
+					return nil, err
+				}
+				commit.Author = sig
+			case "committer":
+				sig, err := newSignatureFromCommitline(line[spacepos+1:])
+				if err != nil {
+					return nil, err
+				}
+				commit.Committer = sig
+			}
+			nextline = nextline + eol + 1
+		case eol == 0:
+			commit.message = string(data[nextline+1:])
+			nextline = nextline + 1
+		default:
+			break l
+		}
+	}
+	return commit, nil
 }
 
 // Find the commit object in the repository.
 func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
-	// first we need to find out where the commit is stored
-	objpath := filepathFromSHA1(repos.Rootdir, oid.String())
-	_, err := os.Stat(objpath)
-	if os.IsNotExist(err) {
-		// doesn't exist, let's look if we find the object somewhere else
-		for _, indexfile := range repos.indexfiles {
-			if offset := indexfile.offsetValues[oid.Bytes]; offset != 0 {
-				// we've found it
-			}
-		}
+	data, err := repos.getRawObject(oid)
+	if err != nil {
+		return nil, err
 	}
-	return nil, nil
+	if err != nil {
+		return nil, err
+	}
+	return parseCommitData(data)
 }

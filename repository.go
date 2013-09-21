@@ -318,6 +318,21 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 	return resultObject, nil
 }
 
+func (repos *Repository) getRawObject(oid *Oid) ([]byte, error) {
+	// first we need to find out where the commit is stored
+	objpath := filepathFromSHA1(repos.Rootdir, oid.String())
+	_, err := os.Stat(objpath)
+	if os.IsNotExist(err) {
+		// doesn't exist, let's look if we find the object somewhere else
+		for _, indexfile := range repos.indexfiles {
+			if offset := indexfile.offsetValues[oid.Bytes]; offset != 0 {
+				return readObjectBytes(indexfile.packpath, offset)
+			}
+		}
+	}
+	return nil, nil
+}
+
 // Open the repository at the given path.
 func OpenRepository(path string) (*Repository, error) {
 	root := new(Repository)

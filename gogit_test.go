@@ -142,6 +142,29 @@ func TestReadLEBase128(t *testing.T) {
 	}
 }
 
+func TestReadCommit(t *testing.T) {
+	commitid := "7647bdef73cde0888222b7ea00f5e83b151a25d0"
+	commitoid, err := NewOidFromString(commitid)
+	if err != nil {
+		t.Error(err)
+	}
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	if err != nil {
+		t.Error(err)
+	}
+	commit, err := repos.LookupCommit(commitoid)
+	if err != nil {
+		t.Error(err)
+	}
+	treeid := "b9a560f9a96f89f3a44508689592ef4b10cc5d22"
+	if commit.TreeId().String() != treeid {
+		t.Error("Expected tree", treeid, "but got", commit.TreeId().String())
+	}
+	if commit.Author.Name != "Patrick Gundlach" {
+		t.Error("Expected author name: Patrick Gundlach but got", commit.Author.Name)
+	}
+}
+
 func BenchmarkSHAtoHex(b *testing.B) {
 	sha_bin := []byte{201, 202, 203, 204, 205, 206, 207, 208, 209, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 0}
 	oid, _ := NewOid(sha_bin)

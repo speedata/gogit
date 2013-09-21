@@ -37,7 +37,7 @@ func NewOid(b []byte) (*Oid, error) {
 }
 
 // Create a new Oid from a 20 byte array
-func NewFromArray(a SHA1) *Oid {
+func NewOidFromArray(a SHA1) *Oid {
 	return &Oid{a}
 }
 
