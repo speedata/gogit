@@ -71,8 +71,9 @@ func readIdxFile(path string) (*index, error) {
 	pos := 8
 	var fanout [256]uint32
 	for i := 0; i < 256; i++ {
+		// TODO: use range
 		fanout[i] = uint32(idx[pos])<<24 + uint32(idx[pos+1])<<16 + uint32(idx[pos+2])<<8 + uint32(idx[pos+3])
-		pos = pos + 4
+		pos += 4
 	}
 	numObjects := int(fanout[255])
 	ids := make([]SHA1, numObjects)
@@ -83,8 +84,8 @@ func readIdxFile(path string) (*index, error) {
 		}
 		pos = pos + 20
 	}
-	// skip crc32
-	pos = pos + 4*numObjects
+	// skip crc32 and offsetValues4
+	pos += 8 * numObjects
 
 	excessLen := len(idx) - 258*4 - 28*numObjects - 40
 	var offsetValues8 []uint64
@@ -150,9 +151,15 @@ func readFromZip(file *os.File, start int64, inflatedSize int64) ([]byte, error)
 	}
 	defer rc.Close()
 	zbuf := make([]byte, inflatedSize)
-	_, err = rc.Read(zbuf)
-	if err != nil {
-		return nil, err
+	// rc.Read can return less than len(zbuf)
+	// I believe it reads at most 0x8000 bytes
+	var n, count int
+	for count < int(inflatedSize) {
+		n, err = rc.Read(zbuf[n:])
+		if err != nil {
+			return nil, err
+		}
+		count += n
 	}
 	return zbuf, nil
 }
