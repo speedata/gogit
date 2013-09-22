@@ -44,21 +44,29 @@ type TreeEntry struct {
 type ObjectType int
 
 const (
-	OBJ_COMMIT ObjectType = iota
-	OBJ_SYMLINK
-	OBJ_TREE
-	OBJ_BLOB
+	ObjectCommit ObjectType = iota
+	ObjectSymlink
+	ObjectTree
+	ObjectBlob
+)
+
+const (
+	FileModeBlob     = 0100644
+	FileModeBlobExec = 0100755
+	FileModeSymlink  = 0120000
+	FileModeCommit   = 0160000
+	FileModeTree     = 0040000
 )
 
 func (t ObjectType) String() string {
 	switch t {
-	case OBJ_COMMIT:
+	case ObjectCommit:
 		return "commit"
-	case OBJ_TREE:
+	case ObjectTree:
 		return "tree"
-	case OBJ_BLOB:
+	case ObjectBlob:
 		return "blob"
-	case OBJ_SYMLINK:
+	case ObjectSymlink:
 		return "symlink"
 	default:
 		return ""
@@ -77,19 +85,22 @@ func parseTreeData(data []byte) (*Tree, error) {
 		spacepos := bytes.IndexByte(data[pos:], ' ')
 		switch string(data[pos : pos+spacepos]) {
 		case "100644":
-			te.Filemode = 0100644
-			te.Type = OBJ_BLOB
+			te.Filemode = FileModeBlob
+			te.Type = ObjectBlob
+		case "100755":
+			te.Filemode = FileModeBlobExec
+			te.Type = ObjectBlob
 		case "120000":
-			te.Filemode = 0120000
-			te.Type = OBJ_SYMLINK
+			te.Filemode = FileModeSymlink
+			te.Type = ObjectSymlink
 		case "160000":
-			te.Filemode = 0160000
-			te.Type = OBJ_COMMIT
+			te.Filemode = FileModeCommit
+			te.Type = ObjectCommit
 		case "40000":
-			te.Filemode = 0040000
-			te.Type = OBJ_TREE
+			te.Filemode = FileModeTree
+			te.Type = ObjectTree
 		default:
-			return nil, errors.New("unknown type: " + string(data[pos:pos+2]))
+			return nil, errors.New("unknown type: " + string(data[pos:pos+spacepos]))
 		}
 		pos += spacepos + 1
 		zero := bytes.IndexByte(data[pos:], 0)
@@ -153,7 +164,7 @@ func (t *Tree) _walk(cb TreeWalkCallback, dirname string) bool {
 			return false
 		case cont == 0:
 			// descend if it is a tree
-			if te.Type == OBJ_TREE {
+			if te.Type == ObjectTree {
 				t, err := t.repository.LookupTree(te.Id)
 				if err != nil {
 					return false
@@ -176,9 +187,9 @@ func (repos *Repository) LookupTree(oid *Oid) (*Tree, error) {
 		return nil, err
 	}
 	tree, err := parseTreeData(data)
-	tree.repository = repos
 	if err != nil {
 		return nil, err
 	}
+	tree.repository = repos
 	return tree, nil
 }

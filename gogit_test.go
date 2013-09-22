@@ -35,7 +35,7 @@ func TestOpen(t *testing.T) {
 		t.Error("inforef.Oid.String()", res, "is not", exp)
 	}
 	// ---------------
-	exp = "29ad9d799ae51db518d09d307125bcc212688eb4"
+	exp = "1337a1a1b0694887722f8bd0e541bd0f6567a471"
 	newref, err := ref.Resolve()
 	if err != nil {
 		t.Error(err)
@@ -209,7 +209,7 @@ func TestReadCommit(t *testing.T) {
 		if te.Name != "dirc" {
 			t.Error("Wrong entry in tree.EntryByIndex. Expected 'dirc', got", te.Name)
 		}
-		if te.Type != OBJ_TREE {
+		if te.Type != ObjectTree {
 			t.Error("Object should be a tree, but is", te.Type.String())
 		}
 	}
@@ -225,7 +225,26 @@ func TestReadCommit(t *testing.T) {
 			t.Error("Expect nil")
 		}
 	}
+}
 
+func TestTree(t *testing.T) {
+	treesha1 := "7cc610f7268f024d3684a3778ff5aac89c2515bc"
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	if err != nil {
+		t.Error(err)
+	}
+	oid, err := NewOidFromString(treesha1)
+	if err != nil {
+		t.Error(err)
+	}
+	tree, err := repos.LookupTree(oid)
+	if err != nil {
+		t.Error(err)
+	}
+	te := tree.EntryByName("execfile1")
+	if te.Filemode != FileModeBlobExec {
+		t.Error("File mode should be executable")
+	}
 }
 
 func TestBlob(t *testing.T) {
@@ -245,5 +264,4 @@ func TestBlob(t *testing.T) {
 	if s := blob.Size(); s != 6 {
 		t.Error("Blob size should be 6, got", s)
 	}
-
 }

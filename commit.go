@@ -154,10 +154,10 @@ func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
 		return nil, err
 	}
 	tree, err := parseTreeData(data)
-	tree.repository = repos
 	if err != nil {
 		return nil, err
 	}
+	tree.repository = repos
 	ci.tree = tree
 	return ci, nil
 }
