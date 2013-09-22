@@ -32,6 +32,8 @@ import (
 	"regexp"
 )
 
+// A Repository is the base of all other actions. If you need to lookup a
+// commit, tree or blob, you do it from here.
 type Repository struct {
 	Rootdir    string
 	indexfiles []*index
@@ -139,7 +141,7 @@ func filepathFromSHA1(rootdir, sha1 string) string {
 }
 
 // Read deflated object from the file.
-func readFromZip(file *os.File, start int64, inflatedSize int64) ([]byte, error) {
+func readCompressedDataFromFile(file *os.File, start int64, inflatedSize int64) ([]byte, error) {
 	_, err := file.Seek(start, os.SEEK_SET)
 	if err != nil {
 		return nil, err
@@ -151,7 +153,7 @@ func readFromZip(file *os.File, start int64, inflatedSize int64) ([]byte, error)
 	}
 	defer rc.Close()
 	zbuf := make([]byte, inflatedSize)
-	// rc.Read can return less than len(zbuf)
+	// rc.Read can return less than len(zbuf), so we keep reading.
 	// I believe it reads at most 0x8000 bytes
 	var n, count int
 	for count < int(inflatedSize) {
@@ -164,7 +166,7 @@ func readFromZip(file *os.File, start int64, inflatedSize int64) ([]byte, error)
 	return zbuf, nil
 }
 
-// buf must be large enough to read the number
+// buf must be large enough to read the number.
 func readLittleEndianBase128Number(buf []byte) (int64, int) {
 	zpos := 0
 	toread := int64(buf[zpos] & 0x7f)
@@ -241,7 +243,7 @@ func applyDelta(b []byte, base []byte, resultLen int64) []byte {
 }
 
 // Read from a pack file (given by path) at position offset. If this is a
-// non-delta object, the bytes are just returned, if the object
+// non-delta object, the (inflated) bytes are just returned, if the object
 // is a deltafied-object, we have to apply the delta to base objects
 // before hand.
 func readObjectBytes(path string, offset uint64) ([]byte, error) {
@@ -275,13 +277,12 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 		pos = pos + 1
 		uncompressedLength = uncompressedLength + (int64(buf[pos]&0x7F) << shift[pos])
 	}
-	pos = pos + 1
+	pos += 1
 
 	var baseObjectOffset uint64
 	switch objecttype {
 	case _PACK_OBJ_COMMIT, _PACK_OBJ_TREE, _PACK_OBJ_BLOB:
-		// commit
-		b, err := readFromZip(file, offsetInt+pos, uncompressedLength)
+		b, err := readCompressedDataFromFile(file, offsetInt+pos, uncompressedLength)
 		return b, err
 	case _PACK_OBJ_TAG:
 		log.Fatal("not implemented yet")
@@ -304,7 +305,7 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, err := readFromZip(file, offsetInt+pos, uncompressedLength)
+	b, err := readCompressedDataFromFile(file, offsetInt+pos, uncompressedLength)
 	if err != nil {
 		return nil, err
 	}
