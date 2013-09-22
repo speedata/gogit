@@ -155,7 +155,7 @@ func readFromZip(file *os.File, start int64, inflatedSize int64) ([]byte, error)
 	// I believe it reads at most 0x8000 bytes
 	var n, count int
 	for count < int(inflatedSize) {
-		n, err = rc.Read(zbuf[n:])
+		n, err = rc.Read(zbuf[count:])
 		if err != nil {
 			return nil, err
 		}
@@ -277,12 +277,6 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 	}
 	pos = pos + 1
 
-	if int64(len(buf))-pos < uncompressedLength {
-		// todo for later: implement when the requested file length
-		// is larger than the buffer we've just read
-		return nil, errors.New("not implemented yet - read more")
-	}
-
 	var baseObjectOffset uint64
 	switch objecttype {
 	case _PACK_OBJ_COMMIT, _PACK_OBJ_TREE, _PACK_OBJ_BLOB:
@@ -305,6 +299,11 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 	case _PACK_OBJ_DELTA_ENCODED_OBJID:
 		// DELTA_ENCODED object w/ base BINARY_OBJID
 		log.Fatal("not implemented yet")
+	}
+	if int64(len(buf))-pos < uncompressedLength {
+		// todo for later: implement when the requested file length
+		// is larger than the buffer we've just read
+		return nil, errors.New("not implemented yet - read more")
 	}
 
 	base, err := readObjectBytes(path, baseObjectOffset)
@@ -345,9 +344,9 @@ func getLengthZeroTerminated(b []byte) (int, int) {
 	return length, pos + 1
 }
 
-// Read the contents of the file at path
+// Read the contents of the object file at path.
 // Return the content type, the contents of the file and error, if any
-func readFile(path string) (string, []byte, error) {
+func readObjectFile(path string) (string, []byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
@@ -370,22 +369,25 @@ func readFile(path string) (string, []byte, error) {
 
 	// length starts at the position after the space
 	length, objstart := getLengthZeroTerminated(b[spaceposition+1:])
+	objstart += spaceposition + 1
 
-	objstart = objstart + spaceposition + 1
 	// if the size of our buffer is less than the object length + the bytes
 	// in front of the object (example: "commit 234\0") we need to increase
 	// the size of the buffer and read the rest. Warning: this should only
 	// be done on small files
 	if n < length+objstart {
-		remaining_bytes := make([]byte, length-first_buffer_size+objstart)
-		n, err = r.Read(remaining_bytes)
-		if n != length-first_buffer_size+objstart {
-			return "", nil, errors.New("Remaining bytes do not match")
+		remainingSize := length - first_buffer_size + objstart
+		remainingBuf := make([]byte, remainingSize)
+		n = 0
+		var count int
+		for count < remainingSize {
+			n, err = r.Read(remainingBuf[count:])
+			if err != nil {
+				return "", nil, err
+			}
+			count += n
 		}
-		if err != nil {
-			return "", nil, err
-		}
-		b = append(b, remaining_bytes...)
+		b = append(b, remainingBuf...)
 	}
 	return objecttype, b[objstart : objstart+length], nil
 }
@@ -403,7 +405,7 @@ func (repos *Repository) getRawObject(oid *Oid) ([]byte, error) {
 		}
 		return nil, errors.New("Object not found")
 	}
-	_, data, err := readFile(objpath)
+	_, data, err := readObjectFile(objpath)
 	return data, err
 }
 
