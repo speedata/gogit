@@ -300,12 +300,6 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 		// DELTA_ENCODED object w/ base BINARY_OBJID
 		log.Fatal("not implemented yet")
 	}
-	if int64(len(buf))-pos < uncompressedLength {
-		// todo for later: implement when the requested file length
-		// is larger than the buffer we've just read
-		return nil, errors.New("not implemented yet - read more")
-	}
-
 	base, err := readObjectBytes(path, baseObjectOffset)
 	if err != nil {
 		return nil, err
