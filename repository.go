@@ -29,7 +29,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 )
 
 // A Repository is the base of all other actions. If you need to lookup a
@@ -434,26 +433,6 @@ func OpenRepository(path string) (*Repository, error) {
 	}
 
 	return root, nil
-}
-
-// A typical Git repository consists of objects (path objects/ in the root directory)
-// and of references to HEAD, branches, tags and such. We can't read the HEAD directly,
-// we first need to resolve the reference to a real object.
-func (repos *Repository) LookupReference(name string) (*Reference, error) {
-	ref := new(Reference)
-	ref.repository = repos
-	f, err := ioutil.ReadFile(filepath.Join(repos.Rootdir, name))
-	if err != nil {
-		return nil, err
-	}
-	ref.Name = name
-	rexp := regexp.MustCompile("ref: (.*)\n")
-	allMatches := rexp.FindAllStringSubmatch(string(f), 1)
-	if len(allMatches) < 1 && len(allMatches[0]) < 1 {
-		return nil, errors.New("Could not parse reference, no match for regexp 'ref: (.*)\\n'.")
-	}
-	ref.dest = allMatches[0][1]
-	return ref, nil
 }
 
 // Return the root directory of the repository. Same as reading from Rootdir.

@@ -18,33 +18,28 @@ func TestOpen(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	exp := "HEAD"
+	exp := "refs/heads/master"
 	res := ref.Name
 	if res != exp {
 		t.Error("in ref.Name", res, "is not", exp)
 	}
-	// Not sure if resolveInfo is really needed, it seems to be for
-	// dumb protocols only
-	inforef, err := ref.resolveInfo()
-	if err != nil {
-		t.Error(err)
-	}
-	exp = "7647bdef73cde0888222b7ea00f5e83b151a25d0"
-	res = inforef.Oid.String()
-	if res != exp {
-		t.Error("inforef.Oid.String()", res, "is not", exp)
-	}
+
+	// // Not sure if resolveInfo is really needed, it seems to be for
+	// // dumb protocols only
+	// inforef, err := ref.resolveInfo()
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// exp = "7647bdef73cde0888222b7ea00f5e83b151a25d0"
+	// res = inforef.Oid.String()
+	// if res != exp {
+	// 	t.Error("inforef.Oid.String()", res, "is not", exp)
+	// }
 	// ---------------
 	exp = "1337a1a1b0694887722f8bd0e541bd0f6567a471"
-	newref, err := ref.Resolve()
-	if err != nil {
-		t.Error(err)
-	}
-	if false {
-		_ = newref
-	}
-	if newref.Oid.String() != exp {
-		t.Error(newref.Oid.String(), "should be", exp)
+	newref := ref.Oid
+	if str := newref.String(); str != exp {
+		t.Error(str, "should be", exp)
 		t.Fail()
 	}
 }

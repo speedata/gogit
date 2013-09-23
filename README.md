@@ -46,11 +46,7 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    head, err := ref.Resolve()
-    if err != nil {
-        log.Fatal(err)
-    }
-    ci, err := repository.LookupCommit(head.Oid)
+    ci, err := repository.LookupCommit(ref.Oid)
     if err != nil {
         log.Fatal(err)
     }

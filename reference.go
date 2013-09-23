@@ -21,7 +21,6 @@
 package gogit
 
 import (
-	"bytes"
 	"errors"
 	"io/ioutil"
 	"os"
@@ -36,6 +35,7 @@ type Reference struct {
 	repository *Repository
 }
 
+// not sure if this is needed...
 func (ref *Reference) resolveInfo() (*Reference, error) {
 	destRef := new(Reference)
 	destRef.Name = ref.dest
@@ -66,30 +66,34 @@ func (ref *Reference) resolveInfo() (*Reference, error) {
 	return nil, errors.New("Could not resolve info/refs")
 }
 
-// Resolve a reference (e.g. "HEAD") to a real object
-func (r *Reference) Resolve() (*Reference, error) {
-	destRef := new(Reference)
-	destRef.Name = r.dest
-
-	destpath := filepath.Join(r.repository.Rootdir, r.dest)
-	_, err := os.Stat(destpath)
-	if os.IsNotExist(err) {
-		// dest does not exist, let's parse info/refs, which comes from git gc(??)
-		return r.resolveInfo()
-	} else if err != nil {
-		return nil, err
-	}
-	b, err := ioutil.ReadFile(destpath)
+// A typical Git repository consists of objects (path objects/ in the root directory)
+// and of references to HEAD, branches, tags and such.
+func (repos *Repository) LookupReference(name string) (*Reference, error) {
+	// First we need to find out what's in the text file. It could be something like
+	//     ref: refs/heads/master
+	// or just a SHA1 such as
+	//     1337a1a1b0694887722f8bd0e541bd0f6567a471
+	ref := new(Reference)
+	ref.repository = repos
+	ref.Name = name
+	f, err := ioutil.ReadFile(filepath.Join(repos.Rootdir, name))
 	if err != nil {
 		return nil, err
 	}
-
-	oid, err := NewOidFromString(string(bytes.TrimSpace(b)))
-	if err != nil {
-		return nil, err
+	rexp := regexp.MustCompile("ref: (.*)\n")
+	allMatches := rexp.FindAllStringSubmatch(string(f), 1)
+	if allMatches == nil {
+		// let's assume this is a SHA1
+		oid, err := NewOidFromString(string(f[:40]))
+		if err != nil {
+			return nil, err
+		}
+		ref.Oid = oid
+		return ref, nil
 	}
-	destRef.Oid = oid
-	return destRef, nil
+	// yes, it's "ref: something". Now let's lookup "something"
+	ref.dest = allMatches[0][1]
+	return repos.LookupReference(ref.dest)
 }
 
 // For compatibility with git2go. Return Oid from referece (same as getting .Oid directly)
