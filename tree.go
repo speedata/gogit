@@ -29,6 +29,7 @@ import (
 // A tree is a flat directory listing.
 type Tree struct {
 	TreeEntries []*TreeEntry
+	Oid         *Oid
 	repository  *Repository
 }
 
@@ -167,6 +168,7 @@ func (repos *Repository) LookupTree(oid *Oid) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
+	tree.Oid = oid
 	tree.repository = repos
 	return tree, nil
 }
