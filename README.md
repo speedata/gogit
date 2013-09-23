@@ -9,6 +9,7 @@ Pure Go read access to a git repository.
 **Installation**: Just run `go get github.com/speedata/gogit`<br>
 **API documentation**: http://godoc.org/github.com/speedata/gogit<br>
 **Contact**: <gundlach@speedata.de>, [@speedata](https://twitter.com/speedata)<br>
+**Repository**: https://github.com/speedata/gogit<br>
 **Dependencies**: None
 
 Example

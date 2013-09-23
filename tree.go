@@ -50,6 +50,8 @@ const (
 	ObjectBlob
 )
 
+// There are only a few file modes in Git. They look like unix file modes, but they can only be
+// one of these.
 const (
 	FileModeBlob     = 0100644
 	FileModeBlobExec = 0100755
@@ -61,13 +63,13 @@ const (
 func (t ObjectType) String() string {
 	switch t {
 	case ObjectCommit:
-		return "commit"
+		return "Commit"
 	case ObjectTree:
-		return "tree"
+		return "Tree"
 	case ObjectBlob:
-		return "blob"
+		return "Blob"
 	case ObjectSymlink:
-		return "symlink"
+		return "Symlink"
 	default:
 		return ""
 	}

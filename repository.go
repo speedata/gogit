@@ -36,7 +36,7 @@ import (
 // commit, tree or blob, you do it from here.
 type Repository struct {
 	Rootdir    string
-	indexfiles []*index
+	indexfiles []*idxFile
 }
 
 type SHA1 [20]byte
@@ -51,15 +51,15 @@ const (
 )
 
 // index file
-type index struct {
+type idxFile struct {
 	indexpath    string
 	packpath     string
 	packversion  uint32
 	offsetValues map[SHA1]uint64
 }
 
-func readIdxFile(path string) (*index, error) {
-	ifile := &index{}
+func readIdxFile(path string) (*idxFile, error) {
+	ifile := &idxFile{}
 	ifile.indexpath = path
 	ifile.packpath = path[0:len(path)-3] + "pack"
 	idx, err := ioutil.ReadFile(path)
@@ -424,9 +424,8 @@ func OpenRepository(path string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	root.indexfiles = make([]*index, len(indexfiles))
+	root.indexfiles = make([]*idxFile, len(indexfiles))
 	for i, indexfile := range indexfiles {
-		// packfile := indexfile[0:len(indexfile)-len("idx")] + ".pack"
 		idx, err := readIdxFile(indexfile)
 		if err != nil {
 			return nil, err
