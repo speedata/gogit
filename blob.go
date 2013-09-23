@@ -26,7 +26,7 @@ type Blob struct {
 
 // Find the blob object in the repository.
 func (repos *Repository) LookupBlob(oid *Oid) (*Blob, error) {
-	data, err := repos.getRawObject(oid)
+	_, data, err := repos.getRawObject(oid)
 	if err != nil {
 		return nil, err
 	}

@@ -132,7 +132,7 @@ l:
 
 // Find the commit object in the repository.
 func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
-	data, err := repos.getRawObject(oid)
+	_, data, err := repos.getRawObject(oid)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
 	ci.repository = repos
 	ci.Oid = oid
 
-	data, err = repos.getRawObject(ci.treeId)
+	_, data, err = repos.getRawObject(ci.treeId)
 	if err != nil {
 		return nil, err
 	}

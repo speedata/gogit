@@ -74,13 +74,16 @@ func TestIdxFile(t *testing.T) {
 	if offset != exp {
 		t.Error("Offset should be", exp, "but is", offset)
 	}
-	b, err := readObjectBytes(idx.packpath, offset)
+	objtype, b, err := readObjectBytes(idx.packpath, offset)
 	if err != nil {
 		t.Error(err)
 	}
 	length := len(b)
 	if length != 267 {
 		t.Error("Expecting length 267 but got", length)
+	}
+	if objtype != ObjectCommit {
+		t.Error("Expected type ObjectCommit, but got", objtype)
 	}
 	prefix := "tree b9a560f9a96f89f3a44508689592ef4b10cc5d22"
 	if !strings.HasPrefix(string(b), prefix) {
@@ -101,9 +104,12 @@ func TestIdxFile(t *testing.T) {
 	if offset != exp {
 		t.Error("Offset should be", exp, "but is", offset)
 	}
-	b, err = readObjectBytes(idx.packpath, offset)
+	objtype, b, err = readObjectBytes(idx.packpath, offset)
 	if err != nil {
 		t.Error(err)
+	}
+	if objtype != ObjectTree {
+		t.Error("Expected type ObjectTree, but got", objtype)
 	}
 	prefix = "40000 dira"
 	length = 202
@@ -296,5 +302,20 @@ func TestTags(t *testing.T) {
 	}
 	if tt := tag.Type; tt != TagCommit {
 		t.Error("tag is not TagCommit")
+	}
+}
+
+func TestObjecttype(t *testing.T) {
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	if err != nil {
+		t.Error(err)
+	}
+	oid, _ := NewOidFromString("e34a238bd4523af233c27b0196c78a7d722e0d0a")
+	objtype, err := repos.Type(oid)
+	if err != nil {
+		t.Error(err)
+	}
+	if objtype != ObjectTree {
+		t.Error("Expect ObjectTree, got", objtype)
 	}
 }

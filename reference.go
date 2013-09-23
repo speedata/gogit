@@ -40,7 +40,7 @@ func (ref *Reference) resolveInfo() (*Reference, error) {
 	destRef := new(Reference)
 	destRef.Name = ref.dest
 
-	destpath := filepath.Join(ref.repository.Rootdir, "info", "refs")
+	destpath := filepath.Join(ref.repository.Path, "info", "refs")
 	_, err := os.Stat(destpath)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 	ref := new(Reference)
 	ref.repository = repos
 	ref.Name = name
-	f, err := ioutil.ReadFile(filepath.Join(repos.Rootdir, name))
+	f, err := ioutil.ReadFile(filepath.Join(repos.Path, name))
 	if err != nil {
 		return nil, err
 	}

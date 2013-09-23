@@ -34,22 +34,41 @@ import (
 // A Repository is the base of all other actions. If you need to lookup a
 // commit, tree or blob, you do it from here.
 type Repository struct {
-	Rootdir    string
+	Path       string
 	indexfiles []*idxFile
 }
 
 type SHA1 [20]byte
 
+// Who am I?
+type ObjectType int
+
 const (
-	_PACK_OBJ_COMMIT               = 0x10
-	_PACK_OBJ_TREE                 = 0x20
-	_PACK_OBJ_BLOB                 = 0x30
-	_PACK_OBJ_TAG                  = 0x40
-	_PACK_OBJ_DELTA_ENCODED_OFFSET = 0x60
-	_PACK_OBJ_DELTA_ENCODED_OBJID  = 0x70
+	ObjectCommit ObjectType = 0x10
+	ObjectTree   ObjectType = 0x20
+	ObjectBlob   ObjectType = 0x30
+	ObjectTag    ObjectType = 0x40
 )
 
-// index file
+func (t ObjectType) String() string {
+	switch t {
+	case ObjectCommit:
+		return "Commit"
+	case ObjectTree:
+		return "Tree"
+	case ObjectBlob:
+		return "Blob"
+	default:
+		return ""
+	}
+}
+
+type Object struct {
+	Type ObjectType
+	Oid  *Oid
+}
+
+// idx-file
 type idxFile struct {
 	indexpath    string
 	packpath     string
@@ -245,27 +264,27 @@ func applyDelta(b []byte, base []byte, resultLen int64) []byte {
 // non-delta object, the (inflated) bytes are just returned, if the object
 // is a deltafied-object, we have to apply the delta to base objects
 // before hand.
-func readObjectBytes(path string, offset uint64) ([]byte, error) {
+func readObjectBytes(path string, offset uint64) (ObjectType, []byte, error) {
 	offsetInt := int64(offset)
 	file, err := os.Open(path)
 	defer file.Close()
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	pos, err := file.Seek(offsetInt, os.SEEK_SET)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if pos != offsetInt {
-		return nil, errors.New("Seek went wrong")
+		return 0, nil, errors.New("Seek went wrong")
 	}
 	buf := make([]byte, 1024)
 	n, err := file.Read(buf)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if n == 0 {
-		return nil, errors.New("Nothing read from pack file")
+		return 0, nil, errors.New("Nothing read from pack file")
 	}
 	pos = int64(0)
 	objecttype := buf[pos] & 0x70
@@ -279,11 +298,11 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 	pos += 1
 
 	var baseObjectOffset uint64
-	switch objecttype {
-	case _PACK_OBJ_COMMIT, _PACK_OBJ_TREE, _PACK_OBJ_BLOB, _PACK_OBJ_TAG:
+	switch ObjectType(objecttype) {
+	case ObjectCommit, ObjectTree, ObjectBlob, ObjectTag:
 		b, err := readCompressedDataFromFile(file, offsetInt+pos, uncompressedLength)
-		return b, err
-	case _PACK_OBJ_DELTA_ENCODED_OFFSET:
+		return ObjectType(objecttype), b, err
+	case 0x60:
 		// DELTA_ENCODED object w/ offset to base
 		// Read the offset first, then calculate the starting point
 		// of the base object
@@ -294,17 +313,17 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 		}
 		baseObjectOffset = uint64(offsetInt - num)
 		pos = pos + 1
-	case _PACK_OBJ_DELTA_ENCODED_OBJID:
+	case 0x70:
 		// DELTA_ENCODED object w/ base BINARY_OBJID
 		log.Fatal("not implemented yet")
 	}
-	base, err := readObjectBytes(path, baseObjectOffset)
+	objtype, base, err := readObjectBytes(path, baseObjectOffset)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	b, err := readCompressedDataFromFile(file, offsetInt+pos, uncompressedLength)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	zpos := 0
 	// This is the length of the base object. Do we need to know it?
@@ -313,7 +332,7 @@ func readObjectBytes(path string, offset uint64) ([]byte, error) {
 	resultObjectLength, bytesRead := readLittleEndianBase128Number(b[zpos:])
 	zpos += bytesRead
 	resultObject := applyDelta(b[zpos:], base, resultObjectLength)
-	return resultObject, nil
+	return objtype, resultObject, nil
 }
 
 // Return length as integer from zero terminated string
@@ -338,26 +357,38 @@ func getLengthZeroTerminated(b []byte) (int, int) {
 
 // Read the contents of the object file at path.
 // Return the content type, the contents of the file and error, if any
-func readObjectFile(path string) (string, []byte, error) {
+func readObjectFile(path string) (ObjectType, []byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	r, err := zlib.NewReader(file)
 	if err != nil {
-		return "", nil, err
+		return 0, nil, err
 	}
 	defer r.Close()
 	first_buffer_size := 1024
 	b := make([]byte, first_buffer_size)
 	n, err := r.Read(b)
 	if err != nil {
-		return "", nil, err
+		return 0, nil, err
 	}
 	spaceposition := bytes.IndexByte(b, ' ')
 
 	// "tree", "commit", "blob", ...
-	objecttype := string(b[:spaceposition])
+	objecttypeString := string(b[:spaceposition])
+	var objecttype ObjectType
+
+	switch objecttypeString {
+	case "blob":
+		objecttype = ObjectBlob
+	case "tree":
+		objecttype = ObjectTree
+	case "commit":
+		objecttype = ObjectCommit
+	case "tag":
+		objecttype = ObjectTag
+	}
 
 	// length starts at the position after the space
 	length, objstart := getLengthZeroTerminated(b[spaceposition+1:])
@@ -375,7 +406,7 @@ func readObjectFile(path string) (string, []byte, error) {
 		for count < remainingSize {
 			n, err = r.Read(remainingBuf[count:])
 			if err != nil {
-				return "", nil, err
+				return 0, nil, err
 			}
 			count += n
 		}
@@ -384,9 +415,9 @@ func readObjectFile(path string) (string, []byte, error) {
 	return objecttype, b[objstart : objstart+length], nil
 }
 
-func (repos *Repository) getRawObject(oid *Oid) ([]byte, error) {
+func (repos *Repository) getRawObject(oid *Oid) (ObjectType, []byte, error) {
 	// first we need to find out where the commit is stored
-	objpath := filepathFromSHA1(repos.Rootdir, oid.String())
+	objpath := filepathFromSHA1(repos.Path, oid.String())
 	_, err := os.Stat(objpath)
 	if os.IsNotExist(err) {
 		// doesn't exist, let's look if we find the object somewhere else
@@ -395,10 +426,10 @@ func (repos *Repository) getRawObject(oid *Oid) ([]byte, error) {
 				return readObjectBytes(indexfile.packpath, offset)
 			}
 		}
-		return nil, errors.New("Object not found")
+		return 0, nil, errors.New("Object not found")
 	}
-	_, data, err := readObjectFile(objpath)
-	return data, err
+	objecttype, data, err := readObjectFile(objpath)
+	return objecttype, data, err
 }
 
 // Open the repository at the given path.
@@ -408,7 +439,7 @@ func OpenRepository(path string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	root.Rootdir = path
+	root.Path = path
 	fm, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -433,8 +464,11 @@ func OpenRepository(path string) (*Repository, error) {
 	return root, nil
 }
 
-// Return the root directory of the repository. Same as reading from Rootdir.
-// For compatibility with git2go.
-func (repos *Repository) Path() string {
-	return repos.Rootdir
+// Get the type of an object.
+func (repos *Repository) Type(oid *Oid) (ObjectType, error) {
+	objtype, _, err := repos.getRawObject(oid)
+	if err != nil {
+		return 0, err
+	}
+	return objtype, nil
 }

@@ -92,7 +92,7 @@ func parseTagData(data []byte) (*Tag, error) {
 
 // Find the tag object in the repository.
 func (repos *Repository) LookupTag(oid *Oid) (*Tag, error) {
-	data, err := repos.getRawObject(oid)
+	_, data, err := repos.getRawObject(oid)
 	if err != nil {
 		return nil, err
 	}

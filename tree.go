@@ -40,16 +40,6 @@ type TreeEntry struct {
 	Type     ObjectType
 }
 
-// Who am I?
-type ObjectType int
-
-const (
-	ObjectCommit ObjectType = iota
-	ObjectSymlink
-	ObjectTree
-	ObjectBlob
-)
-
 // There are only a few file modes in Git. They look like unix file modes, but they can only be
 // one of these.
 const (
@@ -59,21 +49,6 @@ const (
 	FileModeCommit   = 0160000
 	FileModeTree     = 0040000
 )
-
-func (t ObjectType) String() string {
-	switch t {
-	case ObjectCommit:
-		return "Commit"
-	case ObjectTree:
-		return "Tree"
-	case ObjectBlob:
-		return "Blob"
-	case ObjectSymlink:
-		return "Symlink"
-	default:
-		return ""
-	}
-}
 
 // Parse tree information from the (uncompressed) raw
 // data from the tree object.
@@ -94,7 +69,7 @@ func parseTreeData(data []byte) (*Tree, error) {
 			te.Type = ObjectBlob
 		case "120000":
 			te.Filemode = FileModeSymlink
-			te.Type = ObjectSymlink
+			te.Type = ObjectBlob
 		case "160000":
 			te.Filemode = FileModeCommit
 			te.Type = ObjectCommit
@@ -184,7 +159,7 @@ func (t *Tree) _walk(cb TreeWalkCallback, dirname string) bool {
 
 // Find the tree object in the repository.
 func (repos *Repository) LookupTree(oid *Oid) (*Tree, error) {
-	data, err := repos.getRawObject(oid)
+	_, data, err := repos.getRawObject(oid)
 	if err != nil {
 		return nil, err
 	}
