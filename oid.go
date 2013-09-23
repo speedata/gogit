@@ -3,6 +3,7 @@ package gogit
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 )
 
 // Oid is the representation of a sha1-string
@@ -34,6 +35,15 @@ func NewOid(b []byte) (*Oid, error) {
 		o.Bytes[i] = b[i]
 	}
 	return o, nil
+}
+
+// Create a new Oid from a 40 byte slice representing a string. This saves calling
+// string(data) every time we need a new Oid
+func NewOidFromByteString(b []byte) (*Oid, error) {
+	if len(b) != 40 {
+		return nil, errors.New(fmt.Sprintf("Length must be 40, but is %d", len(b)))
+	}
+	return NewOidFromString(string(b))
 }
 
 // Create a new Oid from a 20 byte array

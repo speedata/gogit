@@ -260,3 +260,42 @@ func TestBlob(t *testing.T) {
 		t.Error("Blob size should be 6, got", s)
 	}
 }
+
+func TestRef(t *testing.T) {
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = repos.LookupReference("refs/doesnotexist/doesnotexist")
+	if err == nil {
+		t.Error(err)
+	}
+	exp := "e6f8d0db36fd0e048979d115478abec90682bd78"
+	tag1, err := repos.LookupReference("refs/tags/tag1")
+	if err != nil {
+		t.Error(err)
+	}
+	if tag1oid := tag1.Oid.String(); tag1oid != exp {
+		t.Error("Tag oid should be", exp, "but was", tag1oid)
+	}
+}
+
+func TestTags(t *testing.T) {
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	if err != nil {
+		t.Error(err)
+	}
+	ref, err := repos.LookupReference("refs/tags/tag1")
+	if err != nil {
+		t.Error(err)
+	}
+	tagoid := ref.Oid
+
+	tag, err := repos.LookupTag(tagoid)
+	if err != nil {
+		t.Error(err)
+	}
+	if tt := tag.Type; tt != TagCommit {
+		t.Error("tag is not TagCommit")
+	}
+}
