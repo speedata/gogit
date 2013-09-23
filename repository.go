@@ -289,11 +289,11 @@ func readObjectBytes(path string, offset uint64) (ObjectType, []byte, error) {
 	pos = int64(0)
 	objecttype := buf[pos] & 0x70
 
-	shift := []byte{0, 4, 11} // some more, probably 18, 25, 32
+	shift := [...]byte{0, 4, 11, 28, 25, 32, 39, 46, 53, 60}
 	uncompressedLength := int64(buf[pos] & 0x0F)
 	for buf[pos]&0x80 > 0 {
-		pos = pos + 1
-		uncompressedLength = uncompressedLength + (int64(buf[pos]&0x7F) << shift[pos])
+		pos += 1
+		uncompressedLength += (int64(buf[pos]&0x7F) << shift[pos])
 	}
 	pos += 1
 
