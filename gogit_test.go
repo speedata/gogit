@@ -74,7 +74,7 @@ func TestIdxFile(t *testing.T) {
 	if offset != exp {
 		t.Error("Offset should be", exp, "but is", offset)
 	}
-	objtype, b, err := readObjectBytes(idx.packpath, offset)
+	objtype, _, b, err := readObjectBytes(idx.packpath, offset, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -104,7 +104,7 @@ func TestIdxFile(t *testing.T) {
 	if offset != exp {
 		t.Error("Offset should be", exp, "but is", offset)
 	}
-	objtype, b, err = readObjectBytes(idx.packpath, offset)
+	objtype, _, b, err = readObjectBytes(idx.packpath, offset, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -317,5 +317,14 @@ func TestObjecttype(t *testing.T) {
 	}
 	if objtype != ObjectTree {
 		t.Error("Expect ObjectTree, got", objtype)
+	}
+	size, _ := repos.ObjectSize(oid)
+	if size != 28 {
+		t.Error("size != 28")
+	}
+	oid, _ = NewOidFromString("d2908b1a835a035585c8dc7a244be991cc3468fd")
+	size, _ = repos.ObjectSize(oid)
+	if size != 245 {
+		t.Error("size != 245")
 	}
 }

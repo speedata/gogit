@@ -160,7 +160,7 @@ func (t *Tree) _walk(cb TreeWalkCallback, dirname string) bool {
 
 // Find the tree object in the repository.
 func (repos *Repository) LookupTree(oid *Oid) (*Tree, error) {
-	_, data, err := repos.getRawObject(oid)
+	_, _, data, err := repos.getRawObject(oid)
 	if err != nil {
 		return nil, err
 	}

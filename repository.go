@@ -264,44 +264,53 @@ func applyDelta(b []byte, base []byte, resultLen int64) []byte {
 // non-delta object, the (inflated) bytes are just returned, if the object
 // is a deltafied-object, we have to apply the delta to base objects
 // before hand.
-func readObjectBytes(path string, offset uint64) (ObjectType, []byte, error) {
+func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, length int64, data []byte, err error) {
 	offsetInt := int64(offset)
 	file, err := os.Open(path)
 	defer file.Close()
 	if err != nil {
-		return 0, nil, err
+		return
 	}
 	pos, err := file.Seek(offsetInt, os.SEEK_SET)
 	if err != nil {
-		return 0, nil, err
+		return
 	}
 	if pos != offsetInt {
-		return 0, nil, errors.New("Seek went wrong")
+		err = errors.New("Seek went wrong")
+		return
 	}
 	buf := make([]byte, 1024)
 	n, err := file.Read(buf)
 	if err != nil {
-		return 0, nil, err
+		return
 	}
 	if n == 0 {
-		return 0, nil, errors.New("Nothing read from pack file")
+		err = errors.New("Nothing read from pack file")
+		return
 	}
 	pos = int64(0)
-	objecttype := buf[pos] & 0x70
+	ot = ObjectType(buf[pos] & 0x70)
 
 	shift := [...]byte{0, 4, 11, 28, 25, 32, 39, 46, 53, 60}
-	uncompressedLength := int64(buf[pos] & 0x0F)
+	length = int64(buf[pos] & 0x0F)
 	for buf[pos]&0x80 > 0 {
 		pos += 1
-		uncompressedLength += (int64(buf[pos]&0x7F) << shift[pos])
+		length += (int64(buf[pos]&0x7F) << shift[pos])
 	}
+
+	if sizeonly {
+		// if we are only interested in the size of the object,
+		// we don't need to do more expensive stuff
+		return
+	}
+
 	pos += 1
 
 	var baseObjectOffset uint64
-	switch ObjectType(objecttype) {
+	switch ot {
 	case ObjectCommit, ObjectTree, ObjectBlob, ObjectTag:
-		b, err := readCompressedDataFromFile(file, offsetInt+pos, uncompressedLength)
-		return ObjectType(objecttype), b, err
+		data, err = readCompressedDataFromFile(file, offsetInt+pos, length)
+		return
 	case 0x60:
 		// DELTA_ENCODED object w/ offset to base
 		// Read the offset first, then calculate the starting point
@@ -317,13 +326,14 @@ func readObjectBytes(path string, offset uint64) (ObjectType, []byte, error) {
 		// DELTA_ENCODED object w/ base BINARY_OBJID
 		log.Fatal("not implemented yet")
 	}
-	objtype, base, err := readObjectBytes(path, baseObjectOffset)
+	var base []byte
+	ot, _, base, err = readObjectBytes(path, baseObjectOffset, false)
 	if err != nil {
-		return 0, nil, err
+		return
 	}
-	b, err := readCompressedDataFromFile(file, offsetInt+pos, uncompressedLength)
+	b, err := readCompressedDataFromFile(file, offsetInt+pos, length)
 	if err != nil {
-		return 0, nil, err
+		return
 	}
 	zpos := 0
 	// This is the length of the base object. Do we need to know it?
@@ -331,13 +341,13 @@ func readObjectBytes(path string, offset uint64) (ObjectType, []byte, error) {
 	zpos += bytesRead
 	resultObjectLength, bytesRead := readLittleEndianBase128Number(b[zpos:])
 	zpos += bytesRead
-	resultObject := applyDelta(b[zpos:], base, resultObjectLength)
-	return objtype, resultObject, nil
+	data = applyDelta(b[zpos:], base, resultObjectLength)
+	return
 }
 
 // Return length as integer from zero terminated string
 // and the beginning of the real object
-func getLengthZeroTerminated(b []byte) (int, int) {
+func getLengthZeroTerminated(b []byte) (int64, int64) {
 	i := 0
 	var pos int
 	for b[i] != 0 {
@@ -345,77 +355,86 @@ func getLengthZeroTerminated(b []byte) (int, int) {
 	}
 	pos = i
 	i--
-	length := 0
-	pow := 1
+	var length int64
+	var pow int64
+	pow = 1
 	for i >= 0 {
-		length = length + (int(b[i])-48)*pow
+		length = length + (int64(b[i])-48)*pow
 		pow = pow * 10
 		i--
 	}
-	return length, pos + 1
+	return length, int64(pos) + 1
 }
 
 // Read the contents of the object file at path.
 // Return the content type, the contents of the file and error, if any
-func readObjectFile(path string) (ObjectType, []byte, error) {
+func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, data []byte, err error) {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	r, err := zlib.NewReader(file)
 	if err != nil {
-		return 0, nil, err
+		return
 	}
 	defer r.Close()
-	first_buffer_size := 1024
+	first_buffer_size := int64(1024)
 	b := make([]byte, first_buffer_size)
 	n, err := r.Read(b)
 	if err != nil {
-		return 0, nil, err
+		return
 	}
-	spaceposition := bytes.IndexByte(b, ' ')
+	spaceposition := int64(bytes.IndexByte(b, ' '))
 
 	// "tree", "commit", "blob", ...
 	objecttypeString := string(b[:spaceposition])
-	var objecttype ObjectType
 
 	switch objecttypeString {
 	case "blob":
-		objecttype = ObjectBlob
+		ot = ObjectBlob
 	case "tree":
-		objecttype = ObjectTree
+		ot = ObjectTree
 	case "commit":
-		objecttype = ObjectCommit
+		ot = ObjectCommit
 	case "tag":
-		objecttype = ObjectTag
+		ot = ObjectTag
 	}
 
 	// length starts at the position after the space
-	length, objstart := getLengthZeroTerminated(b[spaceposition+1:])
+	var objstart int64
+	length, objstart = getLengthZeroTerminated(b[spaceposition+1:])
+
+	if sizeonly {
+		// if we are only interested in the size of the object,
+		// we don't need to do more expensive stuff
+		return
+	}
+
 	objstart += spaceposition + 1
 
 	// if the size of our buffer is less than the object length + the bytes
 	// in front of the object (example: "commit 234\0") we need to increase
 	// the size of the buffer and read the rest. Warning: this should only
 	// be done on small files
-	if n < length+objstart {
+	if int64(n) < length+objstart {
 		remainingSize := length - first_buffer_size + objstart
 		remainingBuf := make([]byte, remainingSize)
 		n = 0
-		var count int
+		var count int64
 		for count < remainingSize {
 			n, err = r.Read(remainingBuf[count:])
 			if err != nil {
-				return 0, nil, err
+				return
 			}
-			count += n
+			count += int64(n)
 		}
 		b = append(b, remainingBuf...)
 	}
-	return objecttype, b[objstart : objstart+length], nil
+	data = b[objstart : objstart+length]
+	return
 }
 
-func (repos *Repository) getRawObject(oid *Oid) (ObjectType, []byte, error) {
+func (repos *Repository) getRawObject(oid *Oid) (ObjectType, int64, []byte, error) {
 	// first we need to find out where the commit is stored
 	objpath := filepathFromSHA1(repos.Path, oid.String())
 	_, err := os.Stat(objpath)
@@ -423,13 +442,12 @@ func (repos *Repository) getRawObject(oid *Oid) (ObjectType, []byte, error) {
 		// doesn't exist, let's look if we find the object somewhere else
 		for _, indexfile := range repos.indexfiles {
 			if offset := indexfile.offsetValues[oid.Bytes]; offset != 0 {
-				return readObjectBytes(indexfile.packpath, offset)
+				return readObjectBytes(indexfile.packpath, offset, false)
 			}
 		}
-		return 0, nil, errors.New("Object not found")
+		return 0, 0, nil, errors.New("Object not found")
 	}
-	objecttype, data, err := readObjectFile(objpath)
-	return objecttype, data, err
+	return readObjectFile(objpath, false)
 }
 
 // Open the repository at the given path.
@@ -466,9 +484,31 @@ func OpenRepository(path string) (*Repository, error) {
 
 // Get the type of an object.
 func (repos *Repository) Type(oid *Oid) (ObjectType, error) {
-	objtype, _, err := repos.getRawObject(oid)
+	objtype, _, _, err := repos.getRawObject(oid)
 	if err != nil {
 		return 0, err
 	}
 	return objtype, nil
+}
+
+// Get (inflated) size of an object.
+func (repos *Repository) ObjectSize(oid *Oid) (int64, error) {
+
+	// todo: this is mostly the same as getRawObject -> merge
+	// difference is the boolean in readObjectBytes and readObjectFile
+	objpath := filepathFromSHA1(repos.Path, oid.String())
+	_, err := os.Stat(objpath)
+	if os.IsNotExist(err) {
+		// doesn't exist, let's look if we find the object somewhere else
+		for _, indexfile := range repos.indexfiles {
+			if offset := indexfile.offsetValues[oid.Bytes]; offset != 0 {
+				_, length, _, err := readObjectBytes(indexfile.packpath, offset, true)
+				return length, err
+			}
+		}
+
+		return 0, errors.New("Object not found")
+	}
+	_, length, _, err := readObjectFile(objpath, true)
+	return length, err
 }
