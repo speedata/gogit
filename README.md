@@ -4,7 +4,7 @@ gogit
 Pure Go read access to a git repository.
 
 **State**: In development (testing), actively maintained<br>
-**Maturity level**: 2 (0-5)<br>
+**Maturity level**: 2/5 (works well in all tested repositories, expect API change, few corner cases not implemented yet)<br>
 **License**: Free software (MIT License)<br>
 **Installation**: Just run `go get github.com/speedata/gogit`<br>
 **API documentation**: http://godoc.org/github.com/speedata/gogit<br>

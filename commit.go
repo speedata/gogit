@@ -119,10 +119,10 @@ l:
 				}
 				commit.Committer = sig
 			}
-			nextline = nextline + eol + 1
+			nextline += eol + 1
 		case eol == 0:
 			commit.CommitMessage = string(data[nextline+1:])
-			nextline = nextline + 1
+			nextline++
 		default:
 			break l
 		}

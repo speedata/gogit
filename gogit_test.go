@@ -145,7 +145,6 @@ func TestLookupCommit(t *testing.T) {
 	if n := ci.Author.Name; n != "Patrick Gundlach" {
 		t.Error("Expected Author Patrick Gundlach, but got", n)
 	}
-
 }
 
 func TestReadLEBase128(t *testing.T) {
