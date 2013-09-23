@@ -29,8 +29,8 @@ type Commit struct {
 	Committer     *Signature
 	Oid           *Oid // The id of this commit object
 	CommitMessage string
+	Tree          *Tree
 	treeId        *Oid
-	tree          *Tree
 	parents       []*Oid // sha1 strings
 	repository    *Repository
 }
@@ -70,12 +70,6 @@ func (ci *Commit) ParentId(n int) *Oid {
 // root commit, otherwise 1,2,...
 func (ci *Commit) ParentCount() int {
 	return len(ci.parents)
-}
-
-// Return the (root) tree of this commit.
-// Error is always nil (error is there for compatibility with git2go).
-func (ci *Commit) Tree() (*Tree, error) {
-	return ci.tree, nil
 }
 
 // Return oid of the (root) tree of this commit.
@@ -158,6 +152,6 @@ func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
 		return nil, err
 	}
 	tree.repository = repos
-	ci.tree = tree
+	ci.Tree = tree
 	return ci, nil
 }

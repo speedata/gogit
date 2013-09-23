@@ -4,7 +4,7 @@ gogit
 Pure Go read access to a git repository.
 
 **State**: In development (testing), actively maintained<br>
-**Maturity level**: 1 (0-5)<br>
+**Maturity level**: 2 (0-5)<br>
 **License**: Free software (MIT License)<br>
 **Installation**: Just run `go get github.com/speedata/gogit`<br>
 **API documentation**: http://godoc.org/github.com/speedata/gogit<br>
@@ -50,10 +50,6 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    tree, err := ci.Tree()
-    if err != nil {
-        log.Fatal(err)
-    }
-    tree.Walk(walk)
+    ci.tree.Walk(walk)
 }
 ```

@@ -195,7 +195,7 @@ func TestReadCommit(t *testing.T) {
 	}
 
 	// err is never set
-	tree, _ := commit.Tree()
+	tree := commit.Tree
 	if ec := tree.EntryCount(); ec != 7 {
 		t.Error("Expected 7 entries in the tree, got", ec)
 	}
