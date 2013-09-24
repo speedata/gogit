@@ -260,6 +260,22 @@ func applyDelta(b []byte, base []byte, resultLen int64) []byte {
 	return resultObject
 }
 
+// The object length in a packfile is a bit more difficult than
+// just reading the bytes. The first byte has the length in its
+// lowest four bits, and if bit 7 is set, it means 'more' bytes
+// will follow. These are added to the »left side« of the length
+func readLenInPackFile(buf []byte) (length int, advance int) {
+	advance = 0
+	shift := [...]byte{0, 4, 11, 18, 25, 32, 39, 46, 53, 60}
+	length = int(buf[advance] & 0x0F)
+	for buf[advance]&0x80 > 0 {
+		advance += 1
+		length += (int(buf[advance]&0x7F) << shift[advance])
+	}
+	advance++
+	return
+}
+
 // Read from a pack file (given by path) at position offset. If this is a
 // non-delta object, the (inflated) bytes are just returned, if the object
 // is a deltafied-object, we have to apply the delta to base objects
@@ -288,23 +304,17 @@ func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, 
 		err = errors.New("Nothing read from pack file")
 		return
 	}
-	pos = int64(0)
-	ot = ObjectType(buf[pos] & 0x70)
+	ot = ObjectType(buf[0] & 0x70)
 
-	shift := [...]byte{0, 4, 11, 28, 25, 32, 39, 46, 53, 60}
-	length = int64(buf[pos] & 0x0F)
-	for buf[pos]&0x80 > 0 {
-		pos += 1
-		length += (int64(buf[pos]&0x7F) << shift[pos])
-	}
+	l, p := readLenInPackFile(buf)
+	pos = int64(p)
+	length = int64(l)
 
 	if sizeonly {
 		// if we are only interested in the size of the object,
 		// we don't need to do more expensive stuff
 		return
 	}
-
-	pos += 1
 
 	var baseObjectOffset uint64
 	switch ot {

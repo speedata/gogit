@@ -328,3 +328,23 @@ func TestObjecttype(t *testing.T) {
 		t.Error("size != 245")
 	}
 }
+
+func TestReadLenInPackFile(t *testing.T) {
+	buf := []byte{108, 215, 142}
+	length, advance := readLenInPackFile(buf)
+	if length != 12 {
+		t.Error("length is not 12, but", length)
+	}
+	if advance != 1 {
+		t.Error("advance is not 1, but", advance)
+	}
+
+	buf = []byte{166, 145, 221, 1, 120, 156, 132, 189, 119, 32}
+	length, advance = readLenInPackFile(buf)
+	if length != 452886 {
+		t.Error("length is not 452886, but", length)
+	}
+	if advance != 4 {
+		t.Error("advance is not 4, but", advance)
+	}
+}

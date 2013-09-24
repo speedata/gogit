@@ -129,6 +129,8 @@ type TreeWalkCallback func(string, *TreeEntry) int
 //
 // If the callback returns a positive value, the passed entry will be skipped
 // on the traversal (in pre mode). A negative value stops the walk.
+//
+// Walk will panic() if an error occurs
 func (t *Tree) Walk(callback TreeWalkCallback) error {
 	t._walk(callback, "")
 	return nil
@@ -145,7 +147,7 @@ func (t *Tree) _walk(cb TreeWalkCallback, dirname string) bool {
 			if te.Type == ObjectTree {
 				t, err := t.repository.LookupTree(te.Id)
 				if err != nil {
-					return false
+					panic(err)
 				}
 				if t._walk(cb, path.Join(dirname, te.Name)) == false {
 					return false
