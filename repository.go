@@ -310,15 +310,15 @@ func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, 
 	pos = int64(p)
 	length = int64(l)
 
-	if sizeonly {
-		// if we are only interested in the size of the object,
-		// we don't need to do more expensive stuff
-		return
-	}
-
 	var baseObjectOffset uint64
 	switch ot {
 	case ObjectCommit, ObjectTree, ObjectBlob, ObjectTag:
+		if sizeonly {
+			// if we are only interested in the size of the object,
+			// we don't need to do more expensive stuff
+			return
+		}
+
 		data, err = readCompressedDataFromFile(file, offsetInt+pos, length)
 		return
 	case 0x60:
@@ -351,6 +351,13 @@ func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, 
 	zpos += bytesRead
 	resultObjectLength, bytesRead := readLittleEndianBase128Number(b[zpos:])
 	zpos += bytesRead
+	if sizeonly {
+		// if we are only interested in the size of the object,
+		// we don't need to do more expensive stuff
+		length = resultObjectLength
+		return
+	}
+
 	data = applyDelta(b[zpos:], base, resultObjectLength)
 	return
 }
