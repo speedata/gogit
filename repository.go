@@ -373,6 +373,7 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer file.Close()
 	r, err := zlib.NewReader(file)
 	if err != nil {
 		return
