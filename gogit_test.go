@@ -319,8 +319,8 @@ func TestObjecttype(t *testing.T) {
 		t.Error("Expect ObjectTree, got", objtype)
 	}
 	size, _ := repos.ObjectSize(oid)
-	if size != 28 {
-		t.Error("size != 28")
+	if size != 202 {
+		t.Error("size != 202")
 	}
 	oid, _ = NewOidFromString("d2908b1a835a035585c8dc7a244be991cc3468fd")
 	size, _ = repos.ObjectSize(oid)
