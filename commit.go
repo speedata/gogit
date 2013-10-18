@@ -79,6 +79,7 @@ func (ci *Commit) TreeId() *Oid {
 
 // Parse commit information from the (uncompressed) raw
 // data from the commit object.
+// \n\n separate headers from message
 func parseCommitData(data []byte) (*Commit, error) {
 	commit := new(Commit)
 	commit.parents = make([]*Oid, 0, 1)
@@ -122,7 +123,7 @@ l:
 			nextline += eol + 1
 		case eol == 0:
 			commit.CommitMessage = string(data[nextline+1:])
-			nextline++
+			break l
 		default:
 			break l
 		}
