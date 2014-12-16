@@ -79,8 +79,6 @@ type idxFile struct {
 
 	fanoutTable [256]int64
 
-	numObjects int64
-
 	// These tables are sub-slices of the whole idx file as an mmap
 	shaTable     []byte
 	offsetTable  []byte
@@ -110,15 +108,15 @@ func readIdxFile(path string) (*idxFile, error) {
 		u32 := binary.BigEndian.Uint32(idxMmap[pos : pos+4])
 		ifile.fanoutTable[i] = int64(u32)
 	}
-	ifile.numObjects = int64(ifile.fanoutTable[byte(255)])
+	numObjects := int64(ifile.fanoutTable[byte(255)])
 
 	shaStart := int64(8 + 256*4)
-	ifile.shaTable = idxMmap[shaStart : shaStart+20*ifile.numObjects]
+	ifile.shaTable = idxMmap[shaStart : shaStart+20*numObjects]
 
-	offsetStart := shaStart + 24*ifile.numObjects
-	ifile.offsetTable = idxMmap[offsetStart : offsetStart+4*ifile.numObjects]
+	offsetStart := shaStart + 24*numObjects
+	ifile.offsetTable = idxMmap[offsetStart : offsetStart+4*numObjects]
 
-	offset8Start := offsetStart + 4*ifile.numObjects
+	offset8Start := offsetStart + 4*numObjects
 	ifile.offset8Table = idxMmap[offset8Start : len(idxMmap)-40]
 
 	fi, err := os.Open(ifile.packpath)
