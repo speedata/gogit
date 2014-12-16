@@ -31,7 +31,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/edsrzf/mmap-go"
+	"github.com/speedata/mmap-go"
 )
 
 // A Repository is the base of all other actions. If you need to lookup a
