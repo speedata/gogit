@@ -69,7 +69,7 @@ func TestIdxFile(t *testing.T) {
 	//
 	// Change symlink to file/add symlink to dir
 	oid, _ := NewOidFromString("7647bdef73cde0888222b7ea00f5e83b151a25d0")
-	offset := idx.offsetValues[oid.Bytes]
+	offset := idx.offsetForSHA(oid.Bytes)
 	exp := uint64(12)
 	if offset != exp {
 		t.Error("Offset should be", exp, "but is", offset)
@@ -99,7 +99,7 @@ func TestIdxFile(t *testing.T) {
 	// 100644 blob 6c493ff740f9380390d5c9ddef4af18697ac9375	file2.txt
 	// 120000 blob 39cd5762dce4e1841f2087c1b896b09c0300ec5a	symlink
 	oid, _ = NewOidFromString("e34a238bd4523af233c27b0196c78a7d722e0d0a")
-	offset = idx.offsetValues[oid.Bytes]
+	offset = idx.offsetForSHA(oid.Bytes)
 	exp = uint64(2582)
 	if offset != exp {
 		t.Error("Offset should be", exp, "but is", offset)

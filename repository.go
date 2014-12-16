@@ -23,12 +23,15 @@ package gogit
 import (
 	"bytes"
 	"compress/zlib"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+
+	"github.com/edsrzf/mmap-go"
 )
 
 // A Repository is the base of all other actions. If you need to lookup a
@@ -70,69 +73,54 @@ type Object struct {
 
 // idx-file
 type idxFile struct {
-	indexpath    string
-	packpath     string
-	packversion  uint32
-	offsetValues map[SHA1]uint64
+	indexpath   string
+	packpath    string
+	packversion uint32
+
+	fanoutTable [256]int64
+
+	numObjects int64
+
+	// These tables are sub-slices of the whole idx file as an mmap
+	shaTable     []byte
+	offsetTable  []byte
+	offset8Table []byte
 }
 
 func readIdxFile(path string) (*idxFile, error) {
 	ifile := &idxFile{}
 	ifile.indexpath = path
 	ifile.packpath = path[0:len(path)-3] + "pack"
-	idx, err := ioutil.ReadFile(path)
+
+	idxf, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
+	idxMmap, err := mmap.Map(idxf, mmap.RDONLY, 0)
 
-	if !bytes.HasPrefix(idx, []byte{255, 't', 'O', 'c'}) {
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.HasPrefix(idxMmap, []byte{255, 't', 'O', 'c'}) {
 		return nil, errors.New("Not version 2 index file")
 	}
-	pos := 8
-	var fanout [256]uint32
-	for i := 0; i < 256; i++ {
-		// TODO: use range
-		fanout[i] = uint32(idx[pos])<<24 + uint32(idx[pos+1])<<16 + uint32(idx[pos+2])<<8 + uint32(idx[pos+3])
-		pos += 4
-	}
-	numObjects := int(fanout[255])
-	ids := make([]SHA1, numObjects)
 
-	for i := 0; i < numObjects; i++ {
-		for j := 0; j < 20; j++ {
-			ids[i][j] = idx[pos+j]
-		}
-		pos = pos + 20
+	for i := range ifile.fanoutTable {
+		pos := 8 + i*4
+		u32 := binary.BigEndian.Uint32(idxMmap[pos : pos+4])
+		ifile.fanoutTable[i] = int64(u32)
 	}
-	// skip crc32 and offsetValues4
-	pos += 8 * numObjects
+	ifile.numObjects = int64(ifile.fanoutTable[byte(255)])
 
-	excessLen := len(idx) - 258*4 - 28*numObjects - 40
-	var offsetValues8 []uint64
-	if excessLen > 0 {
-		// We have an index table, so let's read it first
-		offsetValues8 = make([]uint64, excessLen/8)
-		for i := 0; i < excessLen/8; i++ {
-			offsetValues8[i] = uint64(idx[pos])<<070 + uint64(idx[pos+1])<<060 + uint64(idx[pos+2])<<050 + uint64(idx[pos+3])<<040 + uint64(idx[pos+4])<<030 + uint64(idx[pos+5])<<020 + uint64(idx[pos+6])<<010 + uint64(idx[pos+7])
-			pos = pos + 8
-		}
-	}
-	ifile.offsetValues = make(map[SHA1]uint64, numObjects)
-	pos = 258*4 + 24*numObjects
-	for i := 0; i < numObjects; i++ {
-		offset := uint32(idx[pos])<<24 + uint32(idx[pos+1])<<16 + uint32(idx[pos+2])<<8 + uint32(idx[pos+3])
-		offset32ndbit := offset & 0x80000000
-		offset31bits := offset & 0x7FFFFFFF
-		if offset32ndbit == 0x80000000 {
-			// it's an index entry
-			ifile.offsetValues[ids[i]] = offsetValues8[offset31bits]
-		} else {
-			ifile.offsetValues[ids[i]] = uint64(offset31bits)
-		}
-		pos = pos + 4
-	}
-	// sha1Packfile := idx[pos : pos+20]
-	// sha1Index := idx[pos+21 : pos+40]
+	shaStart := int64(8 + 256*4)
+	ifile.shaTable = idxMmap[shaStart : shaStart+20*ifile.numObjects]
+
+	offsetStart := shaStart + 24*ifile.numObjects
+	ifile.offsetTable = idxMmap[offsetStart : offsetStart+4*ifile.numObjects]
+
+	offset8Start := offsetStart + 4*ifile.numObjects
+	ifile.offset8Table = idxMmap[offset8Start : len(idxMmap)-40]
+
 	fi, err := os.Open(ifile.packpath)
 	if err != nil {
 		return nil, err
@@ -147,8 +135,46 @@ func readIdxFile(path string) (*idxFile, error) {
 	if !bytes.HasPrefix(packVersion, []byte{'P', 'A', 'C', 'K'}) {
 		return nil, errors.New("Pack file does not start with 'PACK'")
 	}
-	ifile.packversion = uint32(packVersion[4])<<24 + uint32(packVersion[5])<<16 + uint32(packVersion[6])<<8 + uint32(packVersion[7])
+	ifile.packversion = binary.BigEndian.Uint32(packVersion[4:8])
 	return ifile, nil
+}
+
+func (idx *idxFile) offsetForSHA(target SHA1) uint64 {
+	// Restrict search between shas that start with the correct
+	// byte, thanks to the fanoutTable.
+	var startSearch int64
+	if target[0] > 0 {
+		startSearch = idx.fanoutTable[target[0]-1]
+	}
+	endSearch := idx.fanoutTable[target[0]]
+
+	// Search for the position of the target sha1.
+	var exactMatch bool
+	found := sort.Search(int(endSearch-startSearch), func(i int) bool {
+		cpos := (startSearch + int64(i)) * 20
+		comp := bytes.Compare(target[:], idx.shaTable[cpos:cpos+20])
+		if comp == 0 {
+			exactMatch = true
+		}
+		return comp <= 0
+	})
+	if !exactMatch {
+		return 0
+	}
+
+	// We found it, now read value
+	pos := (startSearch + int64(found)) * 4
+	offset32 := binary.BigEndian.Uint32(idx.offsetTable[pos : pos+4])
+	offset := uint64(offset32)
+
+	// If msb is set, offset is actually an index into the "big" table where each
+	// offset is 8 bytes instead of 4 bytes.
+	if offset&0x80000000 == 0x80000000 {
+		pos := int64(offset&0x7FFFFFFF) * 8
+		offset = binary.BigEndian.Uint64(idx.offset8Table[pos : pos+8])
+	}
+
+	return offset
 }
 
 // If the object is stored in its own file (i.e not in a pack file),
@@ -459,7 +485,7 @@ func (repos *Repository) getRawObject(oid *Oid) (ObjectType, int64, []byte, erro
 	if os.IsNotExist(err) {
 		// doesn't exist, let's look if we find the object somewhere else
 		for _, indexfile := range repos.indexfiles {
-			if offset := indexfile.offsetValues[oid.Bytes]; offset != 0 {
+			if offset := indexfile.offsetForSHA(oid.Bytes); offset != 0 {
 				return readObjectBytes(indexfile.packpath, offset, false)
 			}
 		}
@@ -484,7 +510,7 @@ func OpenRepository(path string) (*Repository, error) {
 		return nil, errors.New(fmt.Sprintf("%q is not a directory."))
 	}
 
-	indexfiles, err := filepath.Glob(filepath.Join(path, "objects/pack/*idx"))
+	indexfiles, err := filepath.Glob(filepath.Join(path, "objects/pack/*.idx"))
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +545,7 @@ func (repos *Repository) ObjectSize(oid *Oid) (int64, error) {
 	if os.IsNotExist(err) {
 		// doesn't exist, let's look if we find the object somewhere else
 		for _, indexfile := range repos.indexfiles {
-			if offset := indexfile.offsetValues[oid.Bytes]; offset != 0 {
+			if offset := indexfile.offsetForSHA(oid.Bytes); offset != 0 {
 				_, length, _, err := readObjectBytes(indexfile.packpath, offset, true)
 				return length, err
 			}

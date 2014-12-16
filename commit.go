@@ -20,9 +20,7 @@
 
 package gogit
 
-import (
-	"bytes"
-)
+import "bytes"
 
 type Commit struct {
 	Author        *Signature
