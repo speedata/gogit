@@ -40,10 +40,6 @@ func (ref *Reference) resolveInfo() (*Reference, error) {
 	destRef.Name = ref.dest
 
 	destpath := filepath.Join(ref.repository.Path, "info", "refs")
-	_, err := os.Stat(destpath)
-	if err != nil {
-		return nil, err
-	}
 	infoContents, err := ioutil.ReadFile(destpath)
 	if err != nil {
 		return nil, err
