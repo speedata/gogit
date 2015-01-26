@@ -35,16 +35,11 @@ type Reference struct {
 	repository *Repository
 }
 
-// not sure if this is needed...
 func (ref *Reference) resolveInfo() (*Reference, error) {
 	destRef := new(Reference)
 	destRef.Name = ref.dest
 
 	destpath := filepath.Join(ref.repository.Path, "info", "refs")
-	_, err := os.Stat(destpath)
-	if err != nil {
-		return nil, err
-	}
 	infoContents, err := ioutil.ReadFile(destpath)
 	if err != nil {
 		return nil, err
@@ -78,6 +73,11 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 	ref.Name = name
 	f, err := ioutil.ReadFile(filepath.Join(repos.Path, name))
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Try looking it up in info/refs.
+			ref.dest = name
+			return ref.resolveInfo()
+		}
 		return nil, err
 	}
 	rexp := regexp.MustCompile("ref: (.*)\n")
