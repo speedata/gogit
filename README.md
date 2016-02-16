@@ -51,7 +51,7 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    ci.tree.Walk(walk)
+    ci.Tree.Walk(walk)
 }
 ```
 
