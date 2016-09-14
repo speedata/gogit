@@ -26,6 +26,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -127,7 +128,7 @@ func readIdxFile(path string) (*idxFile, error) {
 
 	packVersion := make([]byte, 8)
 	_, err = fi.Read(packVersion)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 	if !bytes.HasPrefix(packVersion, []byte{'P', 'A', 'C', 'K'}) {
@@ -200,7 +201,7 @@ func readCompressedDataFromFile(file *os.File, start int64, inflatedSize int64) 
 	var n, count int
 	for count < int(inflatedSize) {
 		n, err = rc.Read(zbuf[count:])
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return nil, err
 		}
 		count += n
@@ -322,7 +323,12 @@ func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, 
 	buf := make([]byte, 1024)
 	n, err := file.Read(buf)
 	if err != nil {
-		return
+		if err == io.EOF && n > 0 {
+			// Ignore EOF error and move on
+			err = nil
+		} else {
+			return
+		}
 	}
 	if n == 0 {
 		err = errors.New("Nothing read from pack file")
@@ -424,7 +430,12 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 	b := make([]byte, first_buffer_size)
 	n, err := r.Read(b)
 	if err != nil {
-		return
+		if err == io.EOF && n > 0 {
+			// Ignore EOF error on read
+			err = nil
+		} else {
+			return
+		}
 	}
 	spaceposition := int64(bytes.IndexByte(b, ' '))
 
@@ -465,7 +476,7 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 		var count int64
 		for count < remainingSize {
 			n, err = r.Read(remainingBuf[count:])
-			if err != nil {
+			if err != nil && err != io.EOF {
 				return
 			}
 			count += int64(n)
