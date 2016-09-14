@@ -3,11 +3,11 @@ gogit
 
 Pure Go read access to a git repository.
 
-**State**: Actively maintained, used in production site, but without warranty, of course.<br>
+**State**: Not really actively maintained, but used in production site, but without warranty, of course.<br>
 **Maturity level**: 4/5 (works well in all tested repositories, expect API change, few corner cases not implemented yet)<br>
 **License**: Free software (MIT License)<br>
 **Installation**: Just run `go get github.com/speedata/gogit`<br>
-**API documentation**: http://godoc.org/github.com/speedata/gogit<br>
+**API documentation**: https://godoc.org/github.com/speedata/gogit<br>
 **Contact**: <gundlach@speedata.de>, [@speedata](https://twitter.com/speedata)<br>
 **Repository**: https://github.com/speedata/gogit<br>
 **Dependencies**: None<br>
@@ -58,10 +58,10 @@ func main() {
 Sample application
 -------------------
 
-We use `gogit` as the backend in http://ctanmirror.speedata.de. This is a
-mirror of CTAN, the comprehensive TeX archive network with approx. 25GB of
+We use `gogit` as the backend in <https://ctanmirror.speedata.de>. This is a
+mirror of [CTAN](https://ctan.org/), the comprehensive TeX archive network with approx. 30GB of
 data. We rsync it from the main site at ctan.org every night and add the
 changes to a git repository (with the regular git command). Then we use this web
 front end to retrieve the historic files.
 
-The git repository is around 60 GB (Oct. 2013).
+The git repository is around 300 GB (Oct. 2016) and dates back to 2013.
