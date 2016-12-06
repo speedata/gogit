@@ -485,6 +485,11 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 		b = append(b, remainingBuf...)
 	}
 	data = b[objstart : objstart+length]
+	if err == io.EOF {
+		// The last read yielded exactly the right number of bytes
+		// as well as an EOF. Ignore the EOF; we succeeded.
+		err = nil
+	}
 	return
 }
 
