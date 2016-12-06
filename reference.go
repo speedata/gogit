@@ -21,11 +21,14 @@
 package gogit
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 type Reference struct {
@@ -80,11 +83,13 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 		}
 		return nil, err
 	}
-	rexp := regexp.MustCompile("ref: (.*)\n")
-	allMatches := rexp.FindAllStringSubmatch(string(f), 1)
-	if allMatches == nil {
+	s := string(bytes.TrimSpace(f))
+	if !strings.HasPrefix(s, "ref: ") {
+		if len(s) != 40 {
+			return nil, fmt.Errorf("malformed ref %q", s)
+		}
 		// let's assume this is a SHA1
-		oid, err := NewOidFromString(string(f[:40]))
+		oid, err := NewOidFromString(s)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +97,7 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 		return ref, nil
 	}
 	// yes, it's "ref: something". Now let's lookup "something"
-	ref.dest = allMatches[0][1]
+	ref.dest = strings.TrimPrefix(s, "ref: ")
 	return repos.LookupReference(ref.dest)
 }
 
