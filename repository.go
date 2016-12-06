@@ -95,6 +95,7 @@ func readIdxFile(path string) (*idxFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer idxf.Close()
 	idxMmap, err := mmap.Map(idxf, mmap.RDONLY, 0)
 
 	if err != nil {
