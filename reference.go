@@ -39,20 +39,13 @@ type Reference struct {
 	repository *Repository
 }
 
-func (ref *Reference) resolveInfo() (*Reference, error) {
-	destRef := new(Reference)
-	destRef.Name = ref.dest
-
-	destpath := filepath.Join(ref.repository.Path, "info", "refs")
-	f, err := os.Open(destpath)
+func resolveFrom(path, name string) (*Reference, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	sha1, err := findRef(f, ref.dest)
-	if err == errRefNotFound {
-		return nil, errors.New("Could not resolve info/refs")
-	}
+	sha1, err := findRef(f, name)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +53,7 @@ func (ref *Reference) resolveInfo() (*Reference, error) {
 	if err != nil {
 		return nil, err
 	}
-	destRef.Oid = oid
-	return destRef, nil
+	return &Reference{Name: name, Oid: oid}, nil
 }
 
 var errRefNotFound = errors.New("ref not found")
@@ -105,9 +97,20 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 	f, err := ioutil.ReadFile(filepath.Join(repos.Path, name))
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Try looking it up in info/refs.
-			ref.dest = name
-			return ref.resolveInfo()
+			// Try looking it up in info/refs and packed-refs.
+			paths := [...]string{
+				filepath.Join(ref.repository.Path, "info", "refs"),
+				filepath.Join(ref.repository.Path, "packed-refs"),
+			}
+			var destref *Reference
+			var err error
+			for _, path := range paths {
+				destref, err = resolveFrom(path, name)
+				if err == nil {
+					break
+				}
+			}
+			return destref, err
 		}
 		return nil, err
 	}
