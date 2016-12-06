@@ -11,11 +11,13 @@ func BenchmarkLookupReference(b *testing.B) {
 	}
 
 	cases := [...]struct {
-		name string
-		ref  string
+		name  string
+		ref   string
+		errok bool
 	}{
 		{name: "HEAD", ref: "HEAD"},
 		{name: "master", ref: "refs/heads/master"},
+		{name: "doesnotexist", ref: "refs/heads/doesnotexist", errok: true},
 	}
 
 	for _, bench := range cases {
@@ -23,7 +25,7 @@ func BenchmarkLookupReference(b *testing.B) {
 			var err error
 			for i := 0; i < b.N; i++ {
 				sinkref, err = repos.LookupReference(bench.ref)
-				if err != nil {
+				if err != nil && !bench.errok {
 					b.Fatal(err)
 				}
 			}
