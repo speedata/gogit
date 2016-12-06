@@ -21,13 +21,14 @@
 package gogit
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -43,25 +44,52 @@ func (ref *Reference) resolveInfo() (*Reference, error) {
 	destRef.Name = ref.dest
 
 	destpath := filepath.Join(ref.repository.Path, "info", "refs")
-	infoContents, err := ioutil.ReadFile(destpath)
+	f, err := os.Open(destpath)
 	if err != nil {
 		return nil, err
 	}
-
-	r := regexp.MustCompile("([[:xdigit:]]+)\t(.*)\n")
-	refs := r.FindAllStringSubmatch(string(infoContents), -1)
-	for _, v := range refs {
-		if v[2] == ref.dest {
-			oid, err := NewOidFromString(v[1])
-			if err != nil {
-				return nil, err
-			}
-			destRef.Oid = oid
-			return destRef, nil
-		}
+	defer f.Close()
+	sha1, err := findRef(f, ref.dest)
+	if err == errRefNotFound {
+		return nil, errors.New("Could not resolve info/refs")
 	}
+	if err != nil {
+		return nil, err
+	}
+	oid, err := NewOidFromString(sha1)
+	if err != nil {
+		return nil, err
+	}
+	destRef.Oid = oid
+	return destRef, nil
+}
 
-	return nil, errors.New("Could not resolve info/refs")
+var errRefNotFound = errors.New("ref not found")
+
+// findRef parses a list of SHA1/ref pairs such as those
+// found in info/refs, packed-refs, or the output of git ls-remote.
+// It looks for ref and returns the corresponding SHA1 string.
+func findRef(r io.Reader, ref string) (string, error) {
+	refb := []byte(ref)
+	scan := bufio.NewScanner(r)
+	for scan.Scan() {
+		line := bytes.TrimSpace(scan.Bytes())
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+		// It appears that info/refs uses tabs to separate sha1s,
+		// whereas packed-refs uses spaces. Be agnostic.
+		ff := bytes.Fields(line)
+		if len(ff) != 2 || len(ff[0]) != 40 || !bytes.Equal(refb, ff[1]) {
+			continue
+		}
+		// Found a well-formed match.
+		return string(ff[0]), nil
+	}
+	if err := scan.Err(); err != nil {
+		return "", err
+	}
+	return "", errRefNotFound
 }
 
 // A typical Git repository consists of objects (path objects/ in the root directory)
