@@ -309,10 +309,10 @@ func readLenInPackFile(buf []byte) (length int, advance int) {
 func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, length int64, data []byte, err error) {
 	offsetInt := int64(offset)
 	file, err := os.Open(path)
-	defer file.Close()
 	if err != nil {
 		return
 	}
+	defer file.Close()
 	pos, err := file.Seek(offsetInt, os.SEEK_SET)
 	if err != nil {
 		return
