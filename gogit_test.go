@@ -1,6 +1,7 @@
 package gogit
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -24,17 +25,18 @@ func TestOpen(t *testing.T) {
 		t.Error("in ref.Name", res, "is not", exp)
 	}
 
-	// // Not sure if resolveInfo is really needed, it seems to be for
-	// // dumb protocols only
-	// inforef, err := ref.resolveInfo()
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-	// exp = "7647bdef73cde0888222b7ea00f5e83b151a25d0"
-	// res = inforef.Oid.String()
-	// if res != exp {
-	// 	t.Error("inforef.Oid.String()", res, "is not", exp)
-	// }
+	// Not sure if resolveInfo is really needed, it seems to be for
+	// dumb protocols only.
+	inforef, err := resolveFrom(filepath.Join(repos.Path, "info", "refs"), "refs/heads/master")
+	if err != nil {
+		t.Error(err)
+	} else {
+		exp = "7647bdef73cde0888222b7ea00f5e83b151a25d0"
+		res = inforef.Oid.String()
+		if res != exp {
+			t.Error("inforef.Oid.String()", res, "is not", exp)
+		}
+	}
 	// ---------------
 	exp = "1337a1a1b0694887722f8bd0e541bd0f6567a471"
 	newref := ref.Oid
@@ -150,6 +152,32 @@ func TestLookupCommit(t *testing.T) {
 	}
 	if n := ci.Author.Name; n != "Patrick Gundlach" {
 		t.Error("Expected Author Patrick Gundlach, but got", n)
+	}
+}
+
+func TestLookupReference(t *testing.T) {
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := [...]struct {
+		ref  string
+		want string
+	}{
+		{ref: "refs/heads/master", want: "1337a1a1b0694887722f8bd0e541bd0f6567a471"},
+		{ref: "HEAD", want: "1337a1a1b0694887722f8bd0e541bd0f6567a471"},
+		{ref: "refs/heads/testpackedref", want: "4603c3eaa3c08accbc887bee3e6294af9cd4bdda"},
+	}
+
+	for _, test := range tests {
+		ref, err := repos.LookupReference(test.ref)
+		if err != nil {
+			t.Errorf("LookupReference(%q) failed: %v", test.ref, err)
+			continue
+		}
+		if got := ref.Target().String(); got != test.want {
+			t.Errorf("LookupReference(%q) = %q want %q", test.ref, got, test.want)
+		}
 	}
 }
 

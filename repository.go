@@ -95,6 +95,7 @@ func readIdxFile(path string) (*idxFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer idxf.Close()
 	idxMmap, err := mmap.Map(idxf, mmap.RDONLY, 0)
 
 	if err != nil {
@@ -308,10 +309,10 @@ func readLenInPackFile(buf []byte) (length int, advance int) {
 func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, length int64, data []byte, err error) {
 	offsetInt := int64(offset)
 	file, err := os.Open(path)
-	defer file.Close()
 	if err != nil {
 		return
 	}
+	defer file.Close()
 	pos, err := file.Seek(offsetInt, os.SEEK_SET)
 	if err != nil {
 		return
@@ -484,6 +485,11 @@ func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, da
 		b = append(b, remainingBuf...)
 	}
 	data = b[objstart : objstart+length]
+	if err == io.EOF {
+		// The last read yielded exactly the right number of bytes
+		// as well as an EOF. Ignore the EOF; we succeeded.
+		err = nil
+	}
 	return
 }
 
