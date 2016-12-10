@@ -128,8 +128,8 @@ func readIdxFile(path string) (*idxFile, error) {
 	defer fi.Close()
 
 	packVersion := make([]byte, 8)
-	_, err = fi.Read(packVersion)
-	if err != nil && err != io.EOF {
+	_, err = io.ReadFull(fi, packVersion)
+	if err != nil {
 		return nil, err
 	}
 	if !bytes.HasPrefix(packVersion, []byte{'P', 'A', 'C', 'K'}) {
