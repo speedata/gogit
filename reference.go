@@ -24,12 +24,10 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type Reference struct {
@@ -49,7 +47,7 @@ func resolveFrom(path, name string) (*Reference, error) {
 	if err != nil {
 		return nil, err
 	}
-	oid, err := NewOidFromString(sha1)
+	oid, err := NewOidFromByteString(sha1)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +58,8 @@ var errRefNotFound = errors.New("ref not found")
 
 // findRef parses a list of SHA1/ref pairs such as those
 // found in info/refs, packed-refs, or the output of git ls-remote.
-// It looks for ref and returns the corresponding SHA1 string.
-func findRef(r io.Reader, ref string) (string, error) {
+// It looks for ref and returns the corresponding hex-encoded SHA1.
+func findRef(r io.Reader, ref string) ([]byte, error) {
 	refb := []byte(ref)
 	scan := bufio.NewScanner(r)
 	for scan.Scan() {
@@ -76,13 +74,15 @@ func findRef(r io.Reader, ref string) (string, error) {
 			continue
 		}
 		// Found a well-formed match.
-		return string(ff[0]), nil
+		return ff[0], nil
 	}
 	if err := scan.Err(); err != nil {
-		return "", err
+		return nil, err
 	}
-	return "", errRefNotFound
+	return nil, errRefNotFound
 }
+
+var refColon = []byte("ref: ")
 
 // A typical Git repository consists of objects (path objects/ in the root directory)
 // and of references to HEAD, branches, tags and such.
@@ -114,13 +114,10 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 		}
 		return nil, err
 	}
-	s := string(bytes.TrimSpace(f))
-	if !strings.HasPrefix(s, "ref: ") {
-		if len(s) != 40 {
-			return nil, fmt.Errorf("malformed ref %q", s)
-		}
-		// let's assume this is a SHA1
-		oid, err := NewOidFromString(s)
+	b := bytes.TrimSpace(f)
+	if !bytes.HasPrefix(b, refColon) {
+		// Try to interpret as a SHA1.
+		oid, err := NewOidFromByteString(b)
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +125,7 @@ func (repos *Repository) LookupReference(name string) (*Reference, error) {
 		return ref, nil
 	}
 	// yes, it's "ref: something". Now let's lookup "something"
-	ref.dest = strings.TrimPrefix(s, "ref: ")
+	ref.dest = string(b[len(refColon):])
 	return repos.LookupReference(ref.dest)
 }
 

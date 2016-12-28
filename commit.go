@@ -93,14 +93,14 @@ l:
 			reftype := line[:spacepos]
 			switch string(reftype) {
 			case "tree":
-				oid, err := NewOidFromString(string(line[spacepos+1:]))
+				oid, err := NewOidFromByteString(line[spacepos+1:])
 				if err != nil {
 					return nil, err
 				}
 				commit.treeId = oid
 			case "parent":
 				// A commit can have one or more parents
-				oid, err := NewOidFromString(string(line[spacepos+1:]))
+				oid, err := NewOidFromByteString(line[spacepos+1:])
 				if err != nil {
 					return nil, err
 				}
