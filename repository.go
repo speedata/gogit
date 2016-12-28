@@ -506,7 +506,7 @@ func (repos *Repository) getRawObject(oid *Oid) (ObjectType, int64, []byte, erro
 				return readObjectBytes(indexfile.packpath, offset, false)
 			}
 		}
-		return 0, 0, nil, errors.New("Object not found")
+		return 0, 0, nil, errObjNotFound
 	}
 	return readObjectFile(objpath, false)
 }
