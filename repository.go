@@ -74,9 +74,7 @@ type Object struct {
 
 // idx-file
 type idxFile struct {
-	indexpath   string
-	packpath    string
-	packversion uint32
+	packpath string
 
 	fanoutTable [256]int64
 
@@ -88,7 +86,6 @@ type idxFile struct {
 
 func readIdxFile(path string) (*idxFile, error) {
 	ifile := &idxFile{}
-	ifile.indexpath = path
 	ifile.packpath = path[0:len(path)-3] + "pack"
 
 	idxf, err := os.Open(path)
@@ -128,14 +125,13 @@ func readIdxFile(path string) (*idxFile, error) {
 	defer fi.Close()
 
 	packVersion := make([]byte, 8)
-	_, err = fi.Read(packVersion)
-	if err != nil && err != io.EOF {
+	_, err = io.ReadFull(fi, packVersion)
+	if err != nil {
 		return nil, err
 	}
 	if !bytes.HasPrefix(packVersion, []byte{'P', 'A', 'C', 'K'}) {
 		return nil, errors.New("Pack file does not start with 'PACK'")
 	}
-	ifile.packversion = binary.BigEndian.Uint32(packVersion[4:8])
 	return ifile, nil
 }
 

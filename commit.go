@@ -93,14 +93,14 @@ l:
 			reftype := line[:spacepos]
 			switch string(reftype) {
 			case "tree":
-				oid, err := NewOidFromString(string(line[spacepos+1:]))
+				oid, err := NewOidFromByteString(line[spacepos+1:])
 				if err != nil {
 					return nil, err
 				}
 				commit.treeId = oid
 			case "parent":
 				// A commit can have one or more parents
-				oid, err := NewOidFromString(string(line[spacepos+1:]))
+				oid, err := NewOidFromByteString(line[spacepos+1:])
 				if err != nil {
 					return nil, err
 				}
@@ -147,10 +147,10 @@ func (repos *Repository) LookupCommit(oid *Oid) (*Commit, error) {
 		return nil, err
 	}
 	tree, err := parseTreeData(data)
-	tree.Oid = ci.TreeId()
 	if err != nil {
 		return nil, err
 	}
+	tree.Oid = ci.TreeId()
 	tree.repository = repos
 	ci.Tree = tree
 	return ci, nil
