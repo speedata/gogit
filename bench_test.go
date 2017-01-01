@@ -2,7 +2,11 @@ package gogit
 
 import "testing"
 
-var sinkref *Reference
+var (
+	sinkblob *Blob
+	sinkref  *Reference
+	sinkrepo *Repository
+)
 
 func BenchmarkLookupReference(b *testing.B) {
 	repos, err := OpenRepository("_testdata/testrepo.git")
@@ -30,5 +34,31 @@ func BenchmarkLookupReference(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func BenchmarkOpenRepository(b *testing.B) {
+	var err error
+	for i := 0; i < b.N; i++ {
+		sinkrepo, err = OpenRepository("_testdata/testrepo.git")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkLookupBlob(b *testing.B) {
+	repos, err := OpenRepository("_testdata/testrepo.git")
+	oid := mustOidFromString(b, "6c493ff740f9380390d5c9ddef4af18697ac9375")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		sinkblob, err = repos.LookupBlob(oid)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
