@@ -193,15 +193,8 @@ func readCompressedDataFromFile(file *os.File, start int64, inflatedSize int64) 
 	}
 	defer rc.Close()
 	zbuf := make([]byte, inflatedSize)
-	// rc.Read can return less than len(zbuf), so we keep reading.
-	// I believe it reads at most 0x8000 bytes
-	var n, count int
-	for count < int(inflatedSize) {
-		n, err = rc.Read(zbuf[count:])
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		count += n
+	if _, err := io.ReadFull(rc, zbuf); err != nil {
+		return nil, err
 	}
 	return zbuf, nil
 }
