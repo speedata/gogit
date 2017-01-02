@@ -31,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/speedata/mmap-go"
 )
@@ -180,6 +181,9 @@ func filepathFromSHA1(rootdir, sha1 string) string {
 	return filepath.Join(rootdir, "objects", sha1[:2], sha1[2:])
 }
 
+// zlibReaderPool holds zlib Readers.
+var zlibReaderPool sync.Pool
+
 // Read deflated object from the file.
 func readCompressedDataFromFile(file *os.File, start int64, inflatedSize int64) ([]byte, error) {
 	_, err := file.Seek(start, os.SEEK_SET)
@@ -187,21 +191,23 @@ func readCompressedDataFromFile(file *os.File, start int64, inflatedSize int64) 
 		return nil, err
 	}
 
-	rc, err := zlib.NewReader(file)
+	z := zlibReaderPool.Get()
+	if z != nil {
+		err = z.(zlib.Resetter).Reset(file, nil)
+	} else {
+		z, err = zlib.NewReader(file)
+	}
+	if z != nil {
+		defer zlibReaderPool.Put(z)
+	}
 	if err != nil {
 		return nil, err
 	}
+	rc := z.(io.ReadCloser)
 	defer rc.Close()
 	zbuf := make([]byte, inflatedSize)
-	// rc.Read can return less than len(zbuf), so we keep reading.
-	// I believe it reads at most 0x8000 bytes
-	var n, count int
-	for count < int(inflatedSize) {
-		n, err = rc.Read(zbuf[count:])
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		count += n
+	if _, err := io.ReadFull(rc, zbuf); err != nil {
+		return nil, err
 	}
 	return zbuf, nil
 }
@@ -500,7 +506,7 @@ func (repos *Repository) getRawObject(oid *Oid) (ObjectType, int64, []byte, erro
 				return readObjectBytes(indexfile.packpath, offset, false)
 			}
 		}
-		return 0, 0, nil, errors.New("Object not found")
+		return 0, 0, nil, errObjNotFound
 	}
 	return readObjectFile(objpath, false)
 }

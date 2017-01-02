@@ -54,7 +54,10 @@ func resolveFrom(path, name string) (*Reference, error) {
 	return &Reference{Name: name, Oid: oid}, nil
 }
 
-var errRefNotFound = errors.New("ref not found")
+var (
+	errRefNotFound = errors.New("ref not found")
+	errObjNotFound = errors.New("object not found")
+)
 
 // findRef parses a list of SHA1/ref pairs such as those
 // found in info/refs, packed-refs, or the output of git ls-remote.
