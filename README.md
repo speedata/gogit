@@ -64,4 +64,4 @@ data. We rsync it from the main site at ctan.org every night and add the
 changes to a git repository (with the regular git command). Then we use this web
 front end to retrieve the historic files.
 
-The git repository is around 300 GB (Oct. 2016) and dates back to 2013.
+The git repository is around 500 GB (May 2017) and dates back to 2013.
