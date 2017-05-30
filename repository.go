@@ -27,7 +27,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -228,7 +227,7 @@ func readLittleEndianBase128Number(buf []byte) (int64, int) {
 
 // We take “delta instructions”, a base object, the expected length
 // of the resulting object and we can create a resulting object.
-func applyDelta(b []byte, base []byte, resultLen int64) []byte {
+func applyDelta(b []byte, base []byte, resultLen int64) ([]byte, error) {
 	resultObject := make([]byte, resultLen)
 	var resultpos uint64
 	var basepos uint64
@@ -281,11 +280,11 @@ func applyDelta(b []byte, base []byte, resultLen int64) []byte {
 				zpos++
 			}
 		} else {
-			log.Fatal("opcode == 0")
+			return nil, fmt.Errorf("opcode == 0")
 		}
 	}
 	// TODO: check if resultlen == resultpos
-	return resultObject
+	return resultObject, nil
 }
 
 // The object length in a packfile is a bit more difficult than
@@ -367,7 +366,8 @@ func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, 
 		pos = pos + 1
 	case 0x70:
 		// DELTA_ENCODED object w/ base BINARY_OBJID
-		log.Fatal("not implemented yet")
+		err = fmt.Errorf("not implemented yet")
+		return
 	}
 	var base []byte
 	ot, _, base, err = readObjectBytes(path, baseObjectOffset, false)
@@ -391,7 +391,7 @@ func readObjectBytes(path string, offset uint64, sizeonly bool) (ot ObjectType, 
 		return
 	}
 
-	data = applyDelta(b[zpos:], base, resultObjectLength)
+	data, err = applyDelta(b[zpos:], base, resultObjectLength)
 	return
 }
 
@@ -419,9 +419,10 @@ func getLengthZeroTerminated(b []byte) (int64, int64) {
 // Read the contents of the object file at path.
 // Return the content type, the contents of the file and error, if any
 func readObjectFile(path string, sizeonly bool) (ot ObjectType, length int64, data []byte, err error) {
-	file, err := os.Open(path)
+	var file *os.File
+	file, err = os.Open(path)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	defer file.Close()
 	r, err := zlib.NewReader(file)
