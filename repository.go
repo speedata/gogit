@@ -94,10 +94,11 @@ func readIdxFile(path string) (*idxFile, error) {
 	}
 	defer idxf.Close()
 	idxMmap, err := mmap.Map(idxf, mmap.RDONLY, 0)
-
 	if err != nil {
 		return nil, err
 	}
+	defer idxMmap.Unmap()
+
 	if !bytes.HasPrefix(idxMmap, []byte{255, 't', 'O', 'c'}) {
 		return nil, errors.New("Not version 2 index file")
 	}
