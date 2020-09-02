@@ -108,16 +108,20 @@ func readIdxFile(path string) (*idxFile, error) {
 		u32 := binary.BigEndian.Uint32(idxMmap[pos : pos+4])
 		ifile.fanoutTable[i] = int64(u32)
 	}
-	numObjects := int64(ifile.fanoutTable[byte(255)])
+
+	numObjects := ifile.fanoutTable[byte(255)]
 
 	shaStart := int64(8 + 256*4)
-	ifile.shaTable = idxMmap[shaStart : shaStart+20*numObjects]
+	ifile.shaTable = make([]byte, len(idxMmap[shaStart : shaStart+20*numObjects]))
+	copy(ifile.shaTable, idxMmap[shaStart : shaStart+20*numObjects])
 
 	offsetStart := shaStart + 24*numObjects
-	ifile.offsetTable = idxMmap[offsetStart : offsetStart+4*numObjects]
+	ifile.offsetTable = make([]byte, len(idxMmap[offsetStart : offsetStart+4*numObjects]))
+	copy(ifile.offsetTable, idxMmap[offsetStart : offsetStart+4*numObjects])
 
 	offset8Start := offsetStart + 4*numObjects
-	ifile.offset8Table = idxMmap[offset8Start : len(idxMmap)-40]
+	ifile.offset8Table = make([]byte, len(idxMmap[offset8Start : len(idxMmap)-40]))
+	copy(ifile.offset8Table, idxMmap[offset8Start : len(idxMmap)-40])
 
 	fi, err := os.Open(ifile.packpath)
 	if err != nil {
