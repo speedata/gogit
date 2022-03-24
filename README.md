@@ -1,6 +1,12 @@
 gogit
 =====
 
+This repository is not maintained anymore and archived.
+
+Original README (the site is not available anymore) follows:
+
+---
+
 Pure Go read access to a git repository.
 
 **State**: Not really actively maintained, but used in production site. Without warranty, of course.<br>
